@@ -330,15 +330,15 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
         {
             Argument.CheckIfNotNull(allowedElements, "allowedElements");
 
-            TThis result = Zero();
+            var result = Builder.Zero();
             if (!double.IsNegativeInfinity(logValue))
             {
                 allowedElements = Distribution.CreatePartialUniform(allowedElements);
-                State finish = result.Start.AddTransition(allowedElements, Weight.FromLogValue(-allowedElements.GetLogAverageOf(allowedElements)));
+                var finish = result.Start.AddTransition(allowedElements, Weight.FromLogValue(-allowedElements.GetLogAverageOf(allowedElements)));
                 finish.SetEndWeight(Weight.FromLogValue(logValue));
             }
 
-            return result;
+            return result.GetAutomaton();
         }
 
         /// <summary>
@@ -382,17 +382,17 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
         {
             Argument.CheckIfNotNull(sequences, "sequences");
 
-            TThis result = Zero();
+            var result = Builder.Zero();
             if (!double.IsNegativeInfinity(logValue))
             {
-                foreach (TSequence sequence in sequences)
+                foreach (var sequence in sequences)
                 {
-                    State sequenceEndState = result.Start.AddTransitionsForSequence(sequence);
+                    var sequenceEndState = result.Start.AddTransitionsForSequence(sequence);
                     sequenceEndState.SetEndWeight(Weight.FromLogValue(logValue));
                 }
             }
 
-            return result;
+            return result.GetAutomaton();
         }
 
         /// <summary>
@@ -457,9 +457,9 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 throw new NotImplementedException("Negative values are not yet supported.");
             }
 
-            TThis result = Zero();
+            var result = Builder.Zero();
             result.Start.SetEndWeight(Weight.FromLogValue(Math.Log(value)));
-            return result;
+            return result.GetAutomaton();
         }
 
         /// <summary>
@@ -554,20 +554,20 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
         {
             Argument.CheckIfNotNull(automata, "automata");
 
-            TThis result = Zero();
-            foreach (TThis automaton in automata)
+            var result = Builder.Zero();
+            foreach (var automaton in automata)
             {
                 if (automaton.IsCanonicZero())
                 {
                     continue;
                 }
 
-                int index = result.States.Count;
-                result.States.Append(automaton.States);
-                result.Start.AddEpsilonTransition(Weight.One, result.States[index + automaton.Start.Index]);
+                int index = result.StatesCount;
+                result.InsertStates(automaton.States);
+                result.Start.AddEpsilonTransition(Weight.One, index + automaton.Start.Index);
             }
 
-            return result;
+            return result.GetAutomaton();
         }
 
         /// <summary>
@@ -651,23 +651,23 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             }
 
             int maxTimes = nonZeroRepetitionWeights[nonZeroRepetitionWeights.Count - 1].Index;
-            TThis result = ConstantOn(1.0, SequenceManipulator.ToSequence(new TElement[0]));
+            var result = Builder.ConstantOn(1.0, SequenceManipulator.ToSequence(new TElement[0]));
 
             // Build a list of all intermediate end states with their target ending weights while adding repetitions
-            var endStatesWithTargetWeights = new List<(State, Weight)>();
+            var endStatesWithTargetWeights = new List<(int, Weight)>();
             int prevStateCount = 0;
             for (int i = 0; i <= maxTimes; ++i)
             {
                 // Remember added ending states
                 if (repetitionNumberWeights[i] > 0)
                 {
-                    for (int j = prevStateCount; j < result.States.Count; ++j)
+                    for (int j = prevStateCount; j < result.StatesCount; ++j)
                     {
-                        var state = result.States[j];
+                        var state = result[j];
                         if (state.CanEnd)
                         {
                             endStatesWithTargetWeights.Add(ValueTuple.Create(
-                                state,
+                                state.Index,
                                 Weight.Product(Weight.FromValue(repetitionNumberWeights[i]), state.EndWeight)));
                         }
                     }
@@ -676,19 +676,19 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 // Add one more repetition
                 if (i != maxTimes)
                 {
-                    prevStateCount = result.States.Count;
-                    result.AppendInPlaceNoOptimizations(automaton);
+                    prevStateCount = result.StatesCount;
+                    result.Append(automaton, false);
                 }
             }
 
             // Set target ending weights
             for (int i = 0; i < endStatesWithTargetWeights.Count; ++i)
             {
-                var (state, weight) = endStatesWithTargetWeights[i];
-                state.SetEndWeight(weight);
+                var (stateIndex, weight) = endStatesWithTargetWeights[i];
+                result[stateIndex].SetEndWeight(weight);
             }
 
-            return result;
+            return result.GetAutomaton();
         }
 
         /// <summary>
@@ -724,25 +724,25 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
 
             TSequence emptySequence = SequenceManipulator.ToSequence(new TElement[0]);
 
-            TThis result = ConstantOn(1.0, emptySequence);
+            var result = Builder.ConstantOn(1.0, emptySequence);
             for (int i = 0; i < minTimes; ++i)
             {
-                result.AppendInPlace(automaton);
+                result.Append(automaton);
             }
 
-            TThis optionalPart = automaton.Clone();
-            for (int i = 0; i < optionalPart.States.Count; ++i)
+            var optionalPart = Builder.FromAutomaton(automaton);
+            for (var i = 0; i < optionalPart.StatesCount; ++i)
             {
-                var state = optionalPart.States[i];
+                var state = optionalPart[i];
                 if (state.CanEnd)
                 {
-                    state.AddEpsilonTransition(state.EndWeight, optionalPart.Start);
+                    state.AddEpsilonTransition(state.EndWeight, optionalPart.StartStateIndex);
                 }
             }
 
-            result.AppendInPlace(Sum(optionalPart, ConstantOn(1.0, emptySequence)));
+            result.Append(Sum(optionalPart.GetAutomaton(), ConstantOn(1.0, emptySequence)));
 
-            return result;
+            return result.GetAutomaton();
         }
 
         #endregion

@@ -224,10 +224,10 @@ namespace Microsoft.ML.Probabilistic.Distributions
         /// </remarks>
         public static TThis SingleElement(TElementDistribution elementDistribution)
         {
-            var func = Automaton<TSequence, TElement, TElementDistribution, TSequenceManipulator, TWeightFunction>.Zero();
+            var func = Automaton<TSequence, TElement, TElementDistribution, TSequenceManipulator, TWeightFunction>.Builder.Zero();
             var end = func.Start.AddTransition(elementDistribution, Weight.One);
             end.SetEndWeight(Weight.One);
-            return FromWorkspace(func);
+            return FromWorkspace(func.GetAutomaton());
         }
 
         /// <summary>
@@ -423,7 +423,8 @@ namespace Microsoft.ML.Probabilistic.Distributions
             var weight = uniformity == DistributionKind.UniformOverLengthThenValue
                 ? Weight.One
                 : Weight.FromLogValue(distLogNormalizer);
-            var func = Automaton<TSequence, TElement, TElementDistribution, TSequenceManipulator, TWeightFunction>.Zero();
+
+            var func = Automaton<TSequence, TElement, TElementDistribution, TSequenceManipulator, TWeightFunction>.Builder.Zero();
             var state = func.Start;
 
             int iterationBound = maxTimes.HasValue ? maxTimes.Value : minTimes;
@@ -443,7 +444,7 @@ namespace Microsoft.ML.Probabilistic.Distributions
                 state.AddSelfTransition(allowedElements, weight);
             }
 
-            return FromWorkspace(func);
+            return FromWorkspace(func.GetAutomaton());
         }
 
         /// <summary>
