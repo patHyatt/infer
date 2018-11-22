@@ -160,25 +160,19 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             /// Gets the total weight of all paths starting at a given state. 
             /// Ending weights are taken into account.
             /// </summary>
-            /// <param name="state">The state.</param>
+            /// <param name="stateIndex">The state Index.</param>
             /// <returns>The computed total weight.</returns>
-            public Weight GetWeightToEnd(State state)
+            public Weight GetWeightToEnd(int stateIndex)
             {
-                Argument.CheckIfValid(!state.IsNull, nameof(state));
-                Argument.CheckIfValid(ReferenceEquals(state.Owner, this.Root.Owner), "state", "The given state belongs to a different automaton.");
-
                 if (!this.weightsToEndComputed)
                 {
                     this.ComputeWeightsToEnd();
                 }
 
-                CondensationStateInfo info;
-                if (!this.stateIdToInfo.TryGetValue(state.Index, out info))
-                {
-                    return Weight.Zero;
-                }
-
-                return info.WeightToEnd;
+                return
+                    this.stateIdToInfo.TryGetValue(stateIndex, out var info)
+                        ? info.WeightToEnd
+                        : Weight.Zero;
             }
 
             /// <summary>

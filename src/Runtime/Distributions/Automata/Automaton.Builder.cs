@@ -30,7 +30,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 this.transitions = new List<LinkedTransition>();
             }
 
-            public int StartStateIndex { get; }
+            public int StartStateIndex { get; set; }
 
             public int StatesCount => states.Count;
 
@@ -45,7 +45,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 return builder;
             }
 
-            public static Builder FromAutomaton(TThis automaton)
+            public static Builder FromAutomaton(Automaton<TSequence, TElement, TElementDistribution, TSequenceManipulator, TThis> automaton)
             {
                 throw new NotImplementedException();
             }
@@ -57,17 +57,121 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
 
             public StateBuilder AddState()
             {
-                int index = this.states.Count;
+                var index = this.states.Count;
                 this.states.Add(new StateData {firstTransition = -1});
                 return new StateBuilder(this, index);
             }
 
-            public void InsertStates(StateCollection states)
+            public void AddStates(int count)
+            {
+                for (var i = 0; i < count; ++i)
+                {
+                    AddState();
+                }
+            }
+
+            public void AddStates(StateCollection states)
             {
                 throw new NotImplementedException();
             }
 
             public void Append(TThis automaton, bool avoidEpsilonTransitions = true)
+            {
+                throw new NotImplementedException();
+                /*
+                 * 
+        if (ReferenceEquals(automaton, this))
+            {
+                automaton = automaton.Clone();
+            }
+
+            // Append the states of the second automaton
+            var endStates = this.States.Where(nd => nd.CanEnd).ToList();
+            int stateCount = this.States.Count;
+
+            this.States.Append(automaton.States, group);
+            var secondStartState = this.States[stateCount + automaton.Start.Index];
+
+            // todo: make efficient
+            bool startIncoming = automaton.Start.HasIncomingTransitions;
+            if (!startIncoming || endStates.All(endState => (endState.TransitionCount == 0)))
+            {
+                foreach (var endState in endStates)
+                {
+                    for (int transitionIndex = 0; transitionIndex < secondStartState.TransitionCount; transitionIndex++)
+                    {
+                        var transition = secondStartState.GetTransition(transitionIndex);
+
+                        if (group != 0)
+                        {
+                            transition.Group = group;
+                        }
+
+                        if (transition.DestinationStateIndex == secondStartState.Index)
+                        {
+                            transition.DestinationStateIndex = endState.Index;
+                        }
+                        else
+                        {
+                            transition.Weight = Weight.Product(transition.Weight, endState.EndWeight);
+                        }
+
+                        endState.Data.AddTransition(transition);
+                    }
+
+                    endState.SetEndWeight(Weight.Product(endState.EndWeight, secondStartState.EndWeight));
+                }
+
+                this.States.Remove(secondStartState.Index);
+                return;
+            }
+
+            for (int i = 0; i < endStates.Count; i++)
+            {
+                State state = endStates[i];
+                state.AddEpsilonTransition(state.EndWeight, secondStartState, group);
+                state.SetEndWeight(Weight.Zero);
+            }
+            */
+
+                /*
+                /// <summary>
+                /// A version of <see cref="AppendInPlace(TThis, int)"/> that is guaranteed to preserve
+                /// the states of both the original automaton and the automaton being appended in the result.
+                /// </summary>
+                /// <param name="automaton">The automaton to append.</param>
+                /// <remarks>
+                /// Useful for implementing functions like <see cref="Repeat(TThis, Vector)"/>,
+                /// where on-the-fly result optimization creates unnecessary complications.
+                /// </remarks>
+                private void AppendInPlaceNoOptimizations(TThis automaton)
+                {
+                    if (ReferenceEquals(automaton, this))
+                    {
+                        automaton = automaton.Clone();
+                    }
+
+                    var stateCount = this.States.Count;
+                    var endStates = this.States.Where(nd => nd.CanEnd).ToList();
+
+                    this.States.Append(automaton.States);
+                    var secondStartState = this.States[stateCount + automaton.Start.Index];
+
+                    foreach (var state in endStates)
+                    {
+                        state.AddEpsilonTransition(state.EndWeight, secondStartState);
+                        state.SetEndWeight(Weight.Zero);
+                    }
+                }
+                */
+            }
+
+            public void SimplifyIfNeeded()
+            {
+                throw new NotImplementedException();
+            }
+
+            public void RemoveDeadStates()
             {
                 throw new NotImplementedException();
             }
@@ -91,6 +195,8 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 public bool CanEnd => this.builder.states[this.Index].CanEnd;
 
                 public Weight EndWeight => this.builder.states[this.Index].EndWeight;
+
+                public int TransitionCount => throw new NotImplementedException();
 
                 internal StateBuilder(Builder builder, int index)
                 {
@@ -238,6 +344,25 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                     }
 
                     return currentState;
+                }
+
+                public TransitionIterator TransitionIterator =>
+                    throw new NotImplementedException();
+            }
+
+            public struct TransitionIterator
+            {
+                public Transition Value
+                {
+                    get => throw new NotImplementedException();
+                    set => throw new NotImplementedException();
+                }
+
+                public bool Ok => throw new NotImplementedException();
+
+                public void Next()
+                {
+                    throw new NotImplementedException();
                 }
             }
 

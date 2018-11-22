@@ -36,7 +36,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             {
                 var weightsFromRoot = ComputeWeightsFromRoot(states.Count, topologicalOrder, group);
                 var weightsToEnd = ComputeWeightsToEnd(states.Count, topologicalOrder, group);
-                var subautomaton = new TThis();
+                var subautomaton = new Builder();
                 var stateMapping = subgraph.ToDictionary(x => x, _ => subautomaton.AddState());
                 var hasNoIncomingTransitions = new HashSet<int>(subgraph);
 
@@ -48,12 +48,15 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                     for (int i = 0; i < states[stateIndex].TransitionCount; i++)
                     {
                         var transition = states[stateIndex].GetTransition(i);
-                        if (transition.Group != group) continue;
+                        if (transition.Group != group)
+                        {
+                            continue;
+                        }
                         hasNoIncomingTransitions.Remove(transition.DestinationStateIndex);
                         newSourceState.AddTransition(
                             transition.ElementDistribution,
                             transition.Weight,
-                            stateMapping[transition.DestinationStateIndex]);
+                            stateMapping[transition.DestinationStateIndex].Index);
                     }
                 }
 
@@ -68,7 +71,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                     var weightFromRoot = newSourceState.TransitionCount > 0 ? weightsFromRoot[stateIndex] : Weight.Zero;
                     if (!weightFromRoot.IsZero)
                     {
-                        subautomaton.Start.AddEpsilonTransition(weightFromRoot, newSourceState);
+                        subautomaton.Start.AddEpsilonTransition(weightFromRoot, newSourceState.Index);
                     }
 
                     // consider end states
@@ -81,11 +84,15 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                     correctionFactor = Weight.Sum(correctionFactor, Weight.Product(weightFromRoot, weightToEnd));
                 }
 
-                if (!correctionFactor.IsZero) throw new Exception("Write a unit test for this case. Code should be fine.");
+                if (!correctionFactor.IsZero)
+                {
+                    throw new Exception("Write a unit test for this case. Code should be fine.");
+                }
+
                 var epsilonWeight = Weight.AbsoluteDifference(weightsToEnd[topologicalOrder[0].Index], correctionFactor);
                 subautomaton.Start.SetEndWeight(epsilonWeight);
 
-                return subautomaton;
+                return subautomaton.GetAutomaton();
             }
 
             /// <summary>

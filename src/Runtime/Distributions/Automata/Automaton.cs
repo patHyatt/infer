@@ -204,17 +204,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
         /// <remarks>
         /// Only a state from <see cref="States"/> can be specified as the value of this property. 
         /// </remarks>
-        public State Start
-        {
-            get => this.States[this.startStateIndex];
-
-            set
-            {
-                Argument.CheckIfValid(!value.IsNull, nameof(value));
-                Argument.CheckIfValid(ReferenceEquals(value.Owner, this), nameof(value), "The given state does not belong to this automaton.");
-                this.startStateIndex = value.Index;
-            }
-        }
+        public State Start => this.States[this.startStateIndex];
 
         #endregion
 
@@ -232,14 +222,19 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
         /// <param name="startStateIndex">The start state.</param>
         /// <returns>The created automaton.</returns>
         [Construction("States", "startStateIndex")]
-        public static TThis FromStates(IReadOnlyList<State> states, int startStateIndex)
+        public static TThis FromStates(State[] states, int startStateIndex)
         {
+            throw new NotImplementedException();
+            
+            /*
             CheckStateConsistency(states, startStateIndex);
 
+            // TODO: optimize
             var result = new TThis();
-            result.States.SetTo(states);
+            result.stateCollection = new StateCollection(result, states);
             result.startStateIndex = startStateIndex;
             return result;
+            */
         }
 
         /// <summary>
@@ -563,7 +558,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 }
 
                 int index = result.StatesCount;
-                result.InsertStates(automaton.States);
+                result.AddStates(automaton.States);
                 result.Start.AddEpsilonTransition(Weight.One, index + automaton.Start.Index);
             }
 
@@ -1040,25 +1035,26 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 return;
             }
 
-            TThis result = automaton.Clone();
-            if (!result.TryDeterminize())
+            var determinizedAutomaton = automaton.Clone();
+            if (!determinizedAutomaton.TryDeterminize())
             {
                 throw new NotImplementedException("Not yet supported for non-determinizable automata.");
             }
 
-            for (int stateId = 0; stateId < result.States.Count; ++stateId)
+            var result = Builder.FromAutomaton(determinizedAutomaton);
+
+            for (int stateId = 0; stateId < result.StatesCount; ++stateId)
             {
-                var state = result.States[stateId];
+                var state = result[stateId];
                 if (state.CanEnd)
                 {
                     // Make all accepting states contibute the desired value to the result
                     state.SetEndWeight(value);
                 }
 
-                for (int transitionIndex = 0; transitionIndex < state.TransitionCount; ++transitionIndex)
+                for (var transitionIterator = state.TransitionIterator; transitionIterator.Ok; transitionIterator.Next())
                 {
-                    // Make all non-zero transition weights unit
-                    var transition = state.GetTransition(transitionIndex);
+                    var transition = transitionIterator.Value;
                     if (!transition.Weight.IsZero)
                     {
                         if (transition.IsEpsilon)
@@ -1071,12 +1067,12 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                             transition.Weight = Weight.FromLogValue(-transition.ElementDistribution.Value.GetLogAverageOf(transition.ElementDistribution.Value));
                         }
 
-                        state.SetTransition(transitionIndex, transition);
+                        transitionIterator.Value = transition;
                     }
                 }
             }
 
-            this.SwapWith(result);
+            this.SwapWith(result.GetAutomaton());
         }
 
         /// <summary>
@@ -1097,16 +1093,16 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
         /// <returns>The created automaton.</returns>
         public TThis Reverse()
         {
-            var result = Zero();
+            var result = Builder.Zero();
 
             // Result already has 1 state, we add the remaining Count-1 states
             result.AddStates(this.States.Count - 1);
 
             // And the new start state
-            result.Start = result.AddState();
+            result.StartStateIndex = result.AddState().Index;
 
             // The start state in the original automaton is going to be the one and only end state in result
-            result.States[this.Start.Index].SetEndWeight(Weight.One);
+            result[this.Start.Index].SetEndWeight(Weight.One);
 
             for (int i = 0; i < this.States.Count; ++i)
             {
@@ -1115,18 +1111,18 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 {
                     // Result has original transitions reversed
                     var oldTransition = oldState.GetTransition(j);
-                    result.States[oldTransition.DestinationStateIndex].AddTransition(
-                        oldTransition.ElementDistribution, oldTransition.Weight, result.States[i]);
+                    result[oldTransition.DestinationStateIndex].AddTransition(
+                        oldTransition.ElementDistribution, oldTransition.Weight, i);
                 }
 
                 // End states of the original automaton are the new start states
                 if (oldState.CanEnd)
                 {
-                    result.Start.AddEpsilonTransition(oldState.EndWeight, result.States[i]);
+                    result.Start.AddEpsilonTransition(oldState.EndWeight, i);
                 }
             }
 
-            return result;
+            return result.GetAutomaton();
         }
 
         /// <summary>
@@ -1189,58 +1185,9 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 return;
             }
 
-            if (ReferenceEquals(automaton, this))
-            {
-                automaton = automaton.Clone();
-            }
-
-            // Append the states of the second automaton
-            var endStates = this.States.Where(nd => nd.CanEnd).ToList();
-            int stateCount = this.States.Count;
-
-            this.States.Append(automaton.States, group);
-            var secondStartState = this.States[stateCount + automaton.Start.Index];
-
-            // todo: make efficient
-            bool startIncoming = automaton.Start.HasIncomingTransitions;
-            if (!startIncoming || endStates.All(endState => (endState.TransitionCount == 0)))
-            {
-                foreach (var endState in endStates)
-                {
-                    for (int transitionIndex = 0; transitionIndex < secondStartState.TransitionCount; transitionIndex++)
-                    {
-                        var transition = secondStartState.GetTransition(transitionIndex);
-
-                        if (group != 0)
-                        {
-                            transition.Group = group;
-                        }
-
-                        if (transition.DestinationStateIndex == secondStartState.Index)
-                        {
-                            transition.DestinationStateIndex = endState.Index;
-                        }
-                        else
-                        {
-                            transition.Weight = Weight.Product(transition.Weight, endState.EndWeight);
-                        }
-
-                        endState.Data.AddTransition(transition);
-                    }
-
-                    endState.SetEndWeight(Weight.Product(endState.EndWeight, secondStartState.EndWeight));
-                }
-
-                this.States.Remove(secondStartState.Index);
-                return;
-            }
-
-            for (int i = 0; i < endStates.Count; i++)
-            {
-                State state = endStates[i];
-                state.AddEpsilonTransition(state.EndWeight, secondStartState, group);
-                state.SetEndWeight(Weight.Zero);
-            }
+            var builder = Builder.FromAutomaton(this);
+            builder.Append(automaton);
+            this.SwapWith(builder.GetAutomaton());
         }
 
         /// <summary>
@@ -1279,45 +1226,126 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             Argument.CheckIfNotNull(automaton1, "automaton1");
             Argument.CheckIfNotNull(automaton2, "automaton2");
 
-            TThis result = Zero();
-            if (!automaton1.IsCanonicZero() && !automaton2.IsCanonicZero())
+            if (automaton1.IsCanonicZero() || automaton2.IsCanonicZero())
             {
-                if (automaton1.UsesGroups())
+                this.SetToZero();
+                return;
+            }
+
+            var result = Builder.Zero();
+            if (automaton1.UsesGroups())
+            {
+                // We cannot swap automaton 1 and automaton 2 as groups from first are used.
+                if (!automaton2.IsEpsilonFree)
                 {
-                    // We cannot swap automaton 1 and automaton 2 as groups from first are used.
-                    if (!automaton2.IsEpsilonFree)
-                    {
-                        automaton2.MakeEpsilonFree();
-                    }
+                    automaton2.MakeEpsilonFree();
                 }
-                else
+            }
+            else
+            {
+                // The second argument of BuildProduct must be epsilon-free
+                if (!automaton1.IsEpsilonFree && !automaton2.IsEpsilonFree)
                 {
-                    // The second argument of BuildProduct must be epsilon-free
-                    if (!automaton1.IsEpsilonFree && !automaton2.IsEpsilonFree)
-                    {
-                        automaton2.MakeEpsilonFree();
-                    }
-                    else if (automaton1.IsEpsilonFree && !automaton2.IsEpsilonFree)
-                    {
-                        Util.Swap(ref automaton1, ref automaton2);
-                    }
+                    automaton2.MakeEpsilonFree();
                 }
-
-                var stateCache = new Dictionary<(int, int), State>(automaton1.States.Count + automaton2.States.Count);
-                result.Start = result.BuildProduct(automaton1.Start, automaton2.Start, stateCache);
-
-                result.RemoveDeadStates(); // Product can potentially create dead states
-                result.PruneTransitionsWithLogWeightLessThan = this.MergePruningWeights(automaton1, automaton2);
-                result.SimplifyIfNeeded();
-                result.LogValueOverride = this.MergeLogValueOverrides(automaton1, automaton2);
-
-                if (this is StringAutomaton && tryDeterminize)
+                else if (automaton1.IsEpsilonFree && !automaton2.IsEpsilonFree)
                 {
-                    result.TryDeterminize();
+                    Util.Swap(ref automaton1, ref automaton2);
                 }
             }
 
-            this.SwapWith(result);
+            var productStateCache = new Dictionary<(int, int), int>(automaton1.States.Count + automaton2.States.Count);
+            result.StartStateIndex = BuildProduct(automaton1.Start, automaton2.Start);
+
+            // TODO
+            /*
+            result.RemoveDeadStates(); // Product can potentially create dead states
+            result.PruneTransitionsWithLogWeightLessThan = this.MergePruningWeights(automaton1, automaton2);
+            result.SimplifyIfNeeded();
+            result.LogValueOverride = this.MergeLogValueOverrides(automaton1, automaton2);
+
+            if (this is StringAutomaton && tryDeterminize)
+            {
+                // TODO
+                result.TryDeterminize();
+            }
+            */
+            if (productStateCache.Count > 0)
+            {
+                throw new NotImplementedException();
+            }
+
+            this.SwapWith(result.GetAutomaton());
+
+            // Recursively builds an automaton representing the product of two given automata.
+            // Returns start state of product automaton.
+            int BuildProduct(State state1, State state2)
+            {
+                Debug.Assert(state1 != null && state2 != null, "Valid states must be provided.");
+                Debug.Assert(
+                    !ReferenceEquals(state1.Owner, this) && !ReferenceEquals(state2.Owner, this),
+                    "Cannot build product in place.");
+                Debug.Assert(
+                    state2.Owner.IsEpsilonFree,
+                    "The second argument of the product operation must be epsilon-free.");
+
+                // State already exists, return its index
+                var statePair = (state1.Index, state2.Index);
+                if (productStateCache.TryGetValue(statePair, out var productStateIndex))
+                {
+                    return productStateIndex;
+                }
+
+                // Create a new state
+                var productState = result.AddState();
+                productStateCache.Add(statePair, productState.Index);
+
+                // Iterate over transitions in state1
+                for (var transition1Index = 0; transition1Index < state1.TransitionCount; transition1Index++)
+                {
+                    var transition1 = state1.GetTransition(transition1Index);
+                    var destState1 = state1.Owner.States[transition1.DestinationStateIndex];
+
+                    if (transition1.IsEpsilon)
+                    {
+                        // Epsilon transition case
+                        var destProductStateIndex = BuildProduct(destState1, state2);
+                        productState.AddEpsilonTransition(transition1.Weight, destProductStateIndex, transition1.Group);
+                        continue;
+                    }
+
+                    // Iterate over transitions in state2
+                    for (int transition2Index = 0; transition2Index < state2.TransitionCount; transition2Index++)
+                    {
+                        var transition2 = state2.GetTransition(transition2Index);
+                        Debug.Assert(
+                            !transition2.IsEpsilon,
+                            "The second argument of the product operation must be epsilon-free.");
+                        var destState2 = state2.Owner.States[transition2.DestinationStateIndex];
+
+                        var productLogNormalizer = Distribution<TElement>.GetLogAverageOf(
+                            transition1.ElementDistribution.Value, transition2.ElementDistribution.Value, out var product);
+                        ////if (product is StringDistribution)
+                        ////{
+                        ////    Console.WriteLine(transition1.ElementDistribution+" x "+transition2.ElementDistribution+" = "+product+" "+productLogNormalizer+" "+transition1.ElementDistribution.Equals(transition1.ElementDistribution)+" "+transition1.ElementDistribution.Equals(transition2.ElementDistribution));
+                        ////}
+                        if (double.IsNegativeInfinity(productLogNormalizer))
+                        {
+                            continue;
+                        }
+
+                        var productWeight = Weight.Product(
+                            transition1.Weight,
+                            transition2.Weight,
+                            Weight.FromLogValue(productLogNormalizer));
+                        var destProductStateIndex = BuildProduct(destState1, destState2);
+                        productState.AddTransition(product, productWeight, destProductStateIndex, transition1.Group);
+                    }
+                }
+
+                productState.SetEndWeight(Weight.Product(state1.EndWeight, state2.EndWeight));
+                return productState.Index;
+            }
         }
 
         /// <summary>
@@ -1422,7 +1450,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 !double.IsPositiveInfinity(logWeight1) && !double.IsPositiveInfinity(logWeight2),
                 "Weights must not be infinite.");
 
-            TThis result = Zero();
+            var result = Builder.Zero();
 
             bool hasFirstTerm = !automaton1.IsCanonicZero() && !double.IsNegativeInfinity(logWeight1);
             bool hasSecondTerm = !automaton2.IsCanonicZero() && !double.IsNegativeInfinity(logWeight2);
@@ -1430,20 +1458,20 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             {
                 if (hasFirstTerm)
                 {
-                    result.States.Append(automaton1.States);
-                    result.Start.AddEpsilonTransition(Weight.FromLogValue(logWeight1), result.States[1 + automaton1.Start.Index]);
+                    result.AddStates(automaton1.States);
+                    result.Start.AddEpsilonTransition(Weight.FromLogValue(logWeight1), 1 + automaton1.Start.Index);
                 }
 
                 if (hasSecondTerm)
                 {
-                    int cnt = result.States.Count;
-                    result.States.Append(automaton2.States);
-                    result.Start.AddEpsilonTransition(Weight.FromLogValue(logWeight2), result.States[cnt + automaton2.Start.Index]);
+                    int cnt = result.StatesCount;
+                    result.AddStates(automaton2.States);
+                    result.Start.AddEpsilonTransition(Weight.FromLogValue(logWeight2), cnt + automaton2.Start.Index);
                 }
             }
 
             result.SimplifyIfNeeded();
-            this.SwapWith(result);
+            this.SwapWith(result.GetAutomaton());
         }
 
         /// <summary>
@@ -1502,12 +1530,8 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
         /// <summary>
         /// Replaces the current automaton with an automaton which is zero everywhere.
         /// </summary>
-        public void SetToZero()
-        {
-            this.stateCollection = new StateCollection(this);
-            this.startStateIndex = this.AddState().Index;
-            this.isEpsilonFree = true;
-        }
+        public void SetToZero() =>
+            this.SwapWith(Builder.Zero().GetAutomaton());
 
         /// <summary>
         /// Replaces the current automaton with an automaton which maps every sequence to a given value.
@@ -1556,12 +1580,14 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             Argument.CheckIfNotNull(allowedElements, "allowedElements");
 
             allowedElements = Distribution.CreatePartialUniform(allowedElements);
-            this.SetToZero();
+            var builder = Builder.Zero();
             if (!double.IsNegativeInfinity(logValue))
             {
-                this.Start.SetEndWeight(Weight.FromLogValue(logValue));
-                this.Start.AddTransition(allowedElements, Weight.FromLogValue(-allowedElements.GetLogAverageOf(allowedElements)), this.Start);
+                builder.Start.SetEndWeight(Weight.FromLogValue(logValue));
+                builder.Start.AddTransition(allowedElements, Weight.FromLogValue(-allowedElements.GetLogAverageOf(allowedElements)), builder.StartStateIndex);
             }
+
+            this.SwapWith(builder.GetAutomaton());
         }
 
         /// <summary>
@@ -1604,33 +1630,36 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             Argument.CheckIfNotNull(sourceAutomaton, "sourceAutomaton");
             Argument.CheckIfNotNull(transitionTransform, "transitionTransform");
 
+            var builder = Builder.Zero();
+
             // Add states
-            this.SetToZero();
-            this.AddStates(sourceAutomaton.States.Count - 1);
+            builder.AddStates(sourceAutomaton.States.Count - 1);
 
             // Copy state parameters and transitions
             for (int stateIndex = 0; stateIndex < sourceAutomaton.States.Count; stateIndex++)
             {
-                var thisState = this.States[stateIndex];
+                var thisState = builder[stateIndex];
                 var otherState = sourceAutomaton.States[stateIndex];
 
                 thisState.SetEndWeight(otherState.EndWeight);
                 if (otherState == sourceAutomaton.Start)
                 {
-                    this.Start = thisState;
+                    builder.StartStateIndex = thisState.Index;
                 }
 
                 for (int transitionIndex = 0; transitionIndex < otherState.TransitionCount; transitionIndex++)
                 {
                     var otherTransition = otherState.GetTransition(transitionIndex);
                     var transformedTransition = transitionTransform(otherTransition.ElementDistribution, otherTransition.Weight, otherTransition.Group);
-                    this.States[stateIndex].AddTransition(
+                    builder[stateIndex].AddTransition(
                         transformedTransition.Item1,
                         transformedTransition.Item2,
-                        this.States[otherTransition.DestinationStateIndex],
+                        otherTransition.DestinationStateIndex,
                         otherTransition.Group);
                 }
             }
+
+            this.SwapWith(builder.GetAutomaton());
         }
 
         /// <summary>
@@ -1789,28 +1818,8 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
 
         #endregion
 
+        // TODO: revise whole region!
         #region Manipulating structure
-
-        /// <summary>
-        /// Adds a new state to the automaton.
-        /// </summary>
-        /// <returns>The added state.</returns>
-        /// <remarks>Indices of the added states are guaranteed to be increasing consecutive.</remarks>
-        public State AddState() => this.States.Add();
-
-        /// <summary>
-        /// Adds a given number of states to the automaton.
-        /// </summary>
-        /// <param name="stateCount">The number of states to add.</param>
-        public void AddStates(int stateCount)
-        {
-            Argument.CheckIfInRange(stateCount >= 0, "stateCount", "The number of states to add must not be negative.");
-
-            for (int i = 0; i < stateCount; i++)
-            {
-                this.AddState();
-            }
-        }
 
         /// <summary>
         /// Gets a value indicating whether this automaton is epsilon-free.
@@ -1874,12 +1883,54 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 return;
             }
 
-            TThis result = Zero();
-            result.Start = result.BuildEpsilonClosure(automaton.Start, new ArrayDictionary<State>(automaton.States.Count));
-            result.LogValueOverride = automaton.LogValueOverride;
-            result.PruneTransitionsWithLogWeightLessThan = automaton.PruneTransitionsWithLogWeightLessThan;
-            result.isEpsilonFree = true;
-            this.SwapWith(result);
+            var result = Builder.Zero();
+            var oldToNewState = new ArrayDictionary<int>(automaton.States.Count);
+            result.StartStateIndex = BuildEpsilonClosure(automaton.Start);
+
+            // TODO:
+            // result.LogValueOverride = automaton.LogValueOverride;
+            // result.PruneTransitionsWithLogWeightLessThan = automaton.PruneTransitionsWithLogWeightLessThan;
+
+            this.SwapWith(result.GetAutomaton());
+
+            // Recursively builds an automaton representing the epsilon closure of a given automaton.
+            // Returns the state index of state representing the closure
+            int BuildEpsilonClosure(State state)
+            {
+                if (oldToNewState.TryGetValue(state.Index, out var resultStateIndex))
+                {
+                    return resultStateIndex;
+                }
+
+                var resultState = result.AddState();
+                oldToNewState.Add(state.Index, resultState.Index);
+
+                var closure = state.GetEpsilonClosure();
+                resultState.SetEndWeight(closure.EndWeight);
+                for (var stateIndex = 0; stateIndex < closure.Size; ++stateIndex)
+                {
+                    var closureState = closure.GetStateByIndex(stateIndex);
+                    var closureStateWeight = closure.GetStateWeightByIndex(stateIndex);
+                    for (var transitionIndex = 0; transitionIndex < closureState.TransitionCount; ++transitionIndex)
+                    {
+                        var transition = closureState.GetTransition(transitionIndex);
+                        if (transition.IsEpsilon)
+                        {
+                            continue;
+                        }
+
+                        var destState = state.Owner.States[transition.DestinationStateIndex];
+                        var closureDestStateIndex = BuildEpsilonClosure(destState);
+                        resultState.AddTransition(
+                            transition.ElementDistribution,
+                            Weight.Product(transition.Weight, closureStateWeight),
+                            closureDestStateIndex,
+                            transition.Group);
+                    }
+                }
+
+                return resultState.Index;
+            }
         }
 
         #endregion
@@ -1968,7 +2019,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             // An automaton, product with which will make every self-loop converging
             var uniformDist = new TElementDistribution();
             uniformDist.SetToUniform();
-            TThis theConverger = Zero();
+            var theConverger = Builder.Zero();
             Weight transitionWeight = Weight.Product(
                 Weight.FromLogValue(-uniformDist.GetLogAverageOf(uniformDist)),
                 Weight.FromLogValue(-maxLogTransitionWeightSum),
@@ -1976,7 +2027,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             theConverger.Start.AddSelfTransition(uniformDist, transitionWeight);
             theConverger.Start.SetEndWeight(Weight.One);
 
-            return theConverger;
+            return theConverger.GetAutomaton();
         }
 
         /// <summary>
@@ -2031,35 +2082,6 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 {
                     LabelReachableNodesDfs(destVertexIndex, visitedVertices, edgeDestinationIndices, edgeArrayStarts);
                 }
-            }
-        }
-
-        /// <summary>
-        /// A version of <see cref="AppendInPlace(TThis, int)"/> that is guaranteed to preserve
-        /// the states of both the original automaton and the automaton being appended in the result.
-        /// </summary>
-        /// <param name="automaton">The automaton to append.</param>
-        /// <remarks>
-        /// Useful for implementing functions like <see cref="Repeat(TThis, Vector)"/>,
-        /// where on-the-fly result optimization creates unnecessary complications.
-        /// </remarks>
-        private void AppendInPlaceNoOptimizations(TThis automaton)
-        {
-            if (ReferenceEquals(automaton, this))
-            {
-                automaton = automaton.Clone();
-            }
-
-            var stateCount = this.States.Count;
-            var endStates = this.States.Where(nd => nd.CanEnd).ToList();
-
-            this.States.Append(automaton.States);
-            var secondStartState = this.States[stateCount + automaton.Start.Index];
-
-            foreach (var state in endStates)
-            {
-                state.AddEpsilonTransition(state.EndWeight, secondStartState);
-                state.SetEndWeight(Weight.Zero);
             }
         }
 
@@ -2196,47 +2218,46 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             noEpsilonTransitions.SetToEpsilonClosureOf((TThis)this); // To get rid of infinite weight closures
 
             Condensation condensation = noEpsilonTransitions.ComputeCondensation(noEpsilonTransitions.Start, tr => true, false);
-            double logNormalizer = condensation.GetWeightToEnd(noEpsilonTransitions.Start).LogValue;
+            double logNormalizer = condensation.GetWeightToEnd(noEpsilonTransitions.Start.Index).LogValue;
             if (normalize)
             {
                 if (!double.IsInfinity(logNormalizer))
                 {
-                    noEpsilonTransitions.PushWeights(condensation);
-                    this.SwapWith(noEpsilonTransitions);
+                    this.SwapWith(PushWeights());
                 }
             }
 
             return logNormalizer;
-        }
 
-        /// <summary>
-        /// Re-distributes weights of the states and transitions so that the underlying automaton becomes stochastic
-        /// (i.e. sum of weights of all the outgoing transitions and the ending weight is 1 for every node).
-        /// </summary>
-        /// <param name="condensation">A condensation of the automaton.</param>
-        private void PushWeights(Condensation condensation)
-        {
-            for (int i = 0; i < this.States.Count; ++i)
+            // Re-distributes weights of the states and transitions so that the underlying automaton becomes stochastic
+            // (i.e. sum of weights of all the outgoing transitions and the ending weight is 1 for every node).
+            TThis PushWeights()
             {
-                var state = this.States[i];
-                Weight weightToEnd = condensation.GetWeightToEnd(state);
-                if (weightToEnd.IsZero)
+                var builder = Builder.FromAutomaton(noEpsilonTransitions);
+                for (int i = 0; i < builder.StatesCount; ++i)
                 {
-                    continue; // End states cannot be reached from this state, no point in normalization
+                    var state = builder[i];
+                    var weightToEnd = condensation.GetWeightToEnd(i);
+                    if (weightToEnd.IsZero)
+                    {
+                        continue; // End states cannot be reached from this state, no point in normalization
+                    }
+
+                    var weightToEndInv = Weight.Inverse(weightToEnd);
+                    for (var transitionIterator = state.TransitionIterator; transitionIterator.Ok; transitionIterator.Next())
+                    {
+                        var transition = transitionIterator.Value;
+                        transition.Weight = Weight.Product(
+                            transition.Weight,
+                            condensation.GetWeightToEnd(transition.DestinationStateIndex),
+                            weightToEndInv);
+                        transitionIterator.Value = transition;
+                    }
+
+                    state.SetEndWeight(Weight.Product(state.EndWeight, weightToEndInv));
                 }
 
-                Weight weightToEndInv = Weight.Inverse(weightToEnd);
-                for (int j = 0; j < state.TransitionCount; ++j)
-                {
-                    Transition transition = state.GetTransition(j);
-                    transition.Weight = Weight.Product(
-                        transition.Weight,
-                        condensation.GetWeightToEnd(this.States[transition.DestinationStateIndex]),
-                        weightToEndInv);
-                    state.SetTransition(j, transition);
-                }
-
-                state.SetEndWeight(Weight.Product(state.EndWeight, weightToEndInv));
+                return builder.GetAutomaton();
             }
         }
 
@@ -2335,124 +2356,6 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             }
 
             return true;
-        }
-
-        /// <summary>
-        /// Recursively builds an automaton representing the product of two given automata.
-        /// The second automaton must be epsilon-free.
-        /// </summary>
-        /// <param name="state1">The currently traversed state of the first automaton.</param>
-        /// <param name="state2">The currently traversed state of the second automaton.</param>
-        /// <param name="productStateCache">
-        /// The mapping from a pair of argument state indices to an index of the corresponding product state.
-        /// </param>
-        /// <returns>The index of the product state corresponding to the given pair of state.</returns>
-        private State BuildProduct(
-            State state1,
-            State state2,
-            Dictionary<(int, int), State> productStateCache)
-        {
-            Debug.Assert(state1 != null && state2 != null, "Valid states must be provided.");
-            Debug.Assert(!ReferenceEquals(state1.Owner, this) && !ReferenceEquals(state2.Owner, this), "Cannot build product in place.");
-            Debug.Assert(state2.Owner.IsEpsilonFree, "The second argument of the product operation must be epsilon-free.");
-
-            // State already exists, return its index
-            var statePair = (state1.Index, state2.Index);
-            State productState;
-            if (productStateCache.TryGetValue(statePair, out productState))
-            {
-                return productState;
-            }
-
-            // Create a new state
-            productState = this.AddState();
-            productStateCache.Add(statePair, productState);
-
-            // Iterate over transitions in state1
-            for (int transition1Index = 0; transition1Index < state1.TransitionCount; transition1Index++)
-            {
-                Transition transition1 = state1.GetTransition(transition1Index);
-                State destState1 = state1.Owner.States[transition1.DestinationStateIndex];
-
-                if (transition1.IsEpsilon)
-                {
-                    // Epsilon transition case
-                    State destProductState = this.BuildProduct(destState1, state2, productStateCache);
-                    productState.AddEpsilonTransition(transition1.Weight, destProductState, transition1.Group);
-                    continue;
-                }
-
-                // Iterate over transitions in state2
-                for (int transition2Index = 0; transition2Index < state2.TransitionCount; transition2Index++)
-                {
-                    Transition transition2 = state2.GetTransition(transition2Index);
-                    Debug.Assert(!transition2.IsEpsilon, "The second argument of the product operation must be epsilon-free.");
-                    State destState2 = state2.Owner.States[transition2.DestinationStateIndex];
-
-                    TElementDistribution product;
-                    double productLogNormalizer = Distribution<TElement>.GetLogAverageOf(
-                        transition1.ElementDistribution.Value, transition2.ElementDistribution.Value, out product);
-                    ////if (product is StringDistribution)
-                    ////{
-                    ////    Console.WriteLine(transition1.ElementDistribution+" x "+transition2.ElementDistribution+" = "+product+" "+productLogNormalizer+" "+transition1.ElementDistribution.Equals(transition1.ElementDistribution)+" "+transition1.ElementDistribution.Equals(transition2.ElementDistribution));
-                    ////}
-                    if (double.IsNegativeInfinity(productLogNormalizer))
-                    {
-                        continue;
-                    }
-
-                    Weight productWeight = Weight.Product(transition1.Weight, transition2.Weight, Weight.FromLogValue(productLogNormalizer));
-                    State destProductState = this.BuildProduct(destState1, destState2, productStateCache);
-                    productState.AddTransition(product, productWeight, destProductState, transition1.Group);
-                }
-            }
-
-            productState.SetEndWeight(Weight.Product(state1.EndWeight, state2.EndWeight));
-            return productState;
-        }
-
-        /// <summary>
-        /// Recursively builds an automaton representing the epsilon closure of a given automaton.
-        /// </summary>
-        /// <param name="state">The currently traversed state of the source automaton.</param>
-        /// <param name="oldToNewState">
-        /// The mapping from the indices of the states of the source automaton to the states of the closure.
-        /// </param>
-        /// <returns>The state representing the closure of <paramref name="state"/>.</returns>
-        private State BuildEpsilonClosure(State state, ArrayDictionary<State> oldToNewState)
-        {
-            Debug.Assert(state != null, "A valid state must be provided.");
-            Debug.Assert(!ReferenceEquals(state.Owner, this), "In-place epsilon closure building is not supported.");
-
-            State resultState;
-            if (oldToNewState.TryGetValue(state.Index, out resultState))
-            {
-                return resultState;
-            }
-
-            resultState = this.AddState();
-            oldToNewState.Add(state.Index, resultState);
-
-            EpsilonClosure closure = state.GetEpsilonClosure();
-            resultState.SetEndWeight(closure.EndWeight);
-            for (int stateIndex = 0; stateIndex < closure.Size; ++stateIndex)
-            {
-                State closureState = closure.GetStateByIndex(stateIndex);
-                Weight closureStateWeight = closure.GetStateWeightByIndex(stateIndex);
-                for (int transitionIndex = 0; transitionIndex < closureState.TransitionCount; ++transitionIndex)
-                {
-                    Transition transition = closureState.GetTransition(transitionIndex);
-                    if (!transition.IsEpsilon)
-                    {
-                        State destState = state.Owner.States[transition.DestinationStateIndex];
-                        State closureDestState = this.BuildEpsilonClosure(destState, oldToNewState);
-                        resultState.AddTransition(
-                            transition.ElementDistribution, Weight.Product(transition.Weight, closureStateWeight), closureDestState, transition.Group);
-                    }
-                }
-            }
-
-            return resultState;
         }
 
         /// <summary>
@@ -2739,10 +2642,14 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
         /// </remarks>
         protected Automaton(SerializationInfo info, StreamingContext context)
         {
+            throw new NotImplementedException();
+
+            /*
             this.stateCollection = new StateCollection(
                 this, (List<StateData>)info.GetValue(nameof(StateCollection.states), typeof(List<StateData>)));
             this.startStateIndex = (int)info.GetValue(nameof(this.startStateIndex), typeof(int));
             this.isEpsilonFree = (bool?)info.GetValue(nameof(this.isEpsilonFree), typeof(bool?));
+            */
         }
 
         void ISerializable.GetObjectData(SerializationInfo info, StreamingContext context)
@@ -2757,6 +2664,9 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
         /// </summary>
         public void Write(Action<double> writeDouble, Action<int> writeInt32, Action<TElementDistribution> writeElementDistribution)
         {
+            throw new NotImplementedException();
+
+            /*
             var propertyMask = new BitVector32();
             var idx = 0;
             propertyMask[1 << idx++] = this.isEpsilonFree.HasValue;
@@ -2787,6 +2697,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             {
                 state.Write(writeInt32, writeDouble, writeElementDistribution);
             }
+            */
         }
 
         /// <summary>
@@ -2794,6 +2705,9 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
         /// </summary>
         public static TThis Read(Func<double> readDouble, Func<int> readInt32, Func<TElementDistribution> readElementDistribution)
         {
+            throw new NotImplementedException();
+
+            /*
             var propertyMask = new BitVector32(readInt32());
             var res = new TThis();
             var idx = 0;
@@ -2835,6 +2749,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             }
 
             return res;
+            */
         }
         #endregion
     }

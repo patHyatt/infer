@@ -81,7 +81,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                         }
                     }
 
-                    this.EndWeight = condensation.GetWeightToEnd(state);
+                    this.EndWeight = condensation.GetWeightToEnd(state.Index);
                 }
             }
 

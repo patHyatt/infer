@@ -34,7 +34,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
         /// </remarks>
         public struct State : IEquatable<State>
         {
-            private readonly List<StateData> states;
+            private readonly StateData[] states;
 
             /// <summary>
             /// Initializes a new instance of <see cref="State"/> class. Used internally by automaton implementation
@@ -42,7 +42,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             /// </summary>
             internal State(
                 Automaton<TSequence, TElement, TElementDistribution, TSequenceManipulator, TThis> owner,
-                List<StateData> states,
+                StateData[] states,
                 int index)
             {
                 this.Owner = owner;
@@ -90,12 +90,6 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             /// <summary>
             /// Gets or sets the ending weight of the state.
             /// </summary>
-            /// <remarks>
-            /// C# compiler disallows to use property setter if it sees that <see cref="States"/> instance is a temporary.
-            /// It is not smart enough to understand that property setter actually changes something behind a reference.
-            /// To overcome this issue special <see cref="SetEndWeight"/> method is added calling which is equivalent
-            /// to calling property setter but is not rejected by compiler.
-            /// </remarks>
             public Weight EndWeight => this.Data.EndWeight;
             
             /// <summary>
