@@ -7,6 +7,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
     using System;
     using System.Collections.Generic;
 
+    using Microsoft.ML.Probabilistic.Core.Collections;
     using Microsoft.ML.Probabilistic.Math;
     using Microsoft.ML.Probabilistic.Utilities;
 

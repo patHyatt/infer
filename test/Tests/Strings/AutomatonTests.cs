@@ -10,6 +10,8 @@ namespace Microsoft.ML.Probabilistic.Tests
     using System.Linq;
     using System.Text.RegularExpressions;
 
+    using Microsoft.ML.Probabilistic.Core.Collections;
+
     using Xunit;
     using Assert = Microsoft.ML.Probabilistic.Tests.AssertHelper;
 

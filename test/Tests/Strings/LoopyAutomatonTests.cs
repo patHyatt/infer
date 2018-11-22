@@ -5,6 +5,9 @@
 namespace Microsoft.ML.Probabilistic.Tests
 {
     using System;
+
+    using Microsoft.ML.Probabilistic.Core.Collections;
+
     using Xunit;
     using Assert = Microsoft.ML.Probabilistic.Tests.AssertHelper;
     using Microsoft.ML.Probabilistic.Distributions;

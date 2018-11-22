@@ -9,6 +9,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
     using System.Runtime.Serialization;
     using System.Text;
 
+    using Microsoft.ML.Probabilistic.Core.Collections;
     using Microsoft.ML.Probabilistic.Distributions;
     using Microsoft.ML.Probabilistic.Math;
     using Microsoft.ML.Probabilistic.Serialization;
