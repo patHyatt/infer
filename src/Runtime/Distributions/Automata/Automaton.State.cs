@@ -12,6 +12,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
     using System.Text;
 
     using Microsoft.ML.Probabilistic.Collections;
+    using Microsoft.ML.Probabilistic.Core.Collections;
     using Microsoft.ML.Probabilistic.Distributions;
     using Microsoft.ML.Probabilistic.Math;
     using Microsoft.ML.Probabilistic.Serialization;
@@ -34,7 +35,9 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
         /// </remarks>
         public struct State : IEquatable<State>
         {
-            private readonly StateData[] states;
+            private readonly ReadOnlyArray<StateData> states;
+
+            private readonly ReadOnlyArray<Transition> transitions;
 
             /// <summary>
             /// Initializes a new instance of <see cref="State"/> class. Used internally by automaton implementation
@@ -42,15 +45,17 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             /// </summary>
             internal State(
                 Automaton<TSequence, TElement, TElementDistribution, TSequenceManipulator, TThis> owner,
-                StateData[] states,
+                ReadOnlyArray<StateData> states,
+                ReadOnlyArray<Transition> transitions,
                 int index)
             {
                 this.Owner = owner;
                 this.states = states;
+                this.transitions = transitions;
                 this.Index = index;
-                this.Initialized = true;
             }
 
+/*
             /// <summary>
             /// Initializes a new instance of the <see cref="State"/> class. Created state does not belong
             /// to any automaton and has to be added to some automaton explicitly via Automaton.AddStates.
@@ -63,17 +68,11 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 : this()
             {
                 throw new NotImplementedException();
-                /*
                 Argument.CheckIfInRange(index >= 0, "index", "State index must be non-negative.");
                 this.Index = index;
-                this.states[this.Index] = new StateData(transitions, endWeight);
-                */
+                this.states[this.Index] = new StateData(transitions, EndWeight);
             }
-
-            /// <summary>
-            /// Returns where this State represents some valid state in automaton.
-            /// </summary>
-            public bool IsNull => !this.Initialized;
+*/
 
             /// <summary>
             /// Automaton to which this state belongs.
@@ -85,8 +84,6 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             /// </summary>
             public int Index { get; }
 
-            public bool Initialized { get; }
-
             /// <summary>
             /// Gets or sets the ending weight of the state.
             /// </summary>
@@ -97,18 +94,13 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             /// </summary>
             public bool CanEnd => this.Data.CanEnd;
 
-            /// <summary>
-            /// Gets the number of outgoing transitions.
-            /// </summary>
-            public int TransitionCount => this.Data.TransitionCount;
+            public ReadOnlyArrayView<Transition> Transitions =>
+                new ReadOnlyArrayView<Transition>(
+                    this.transitions,
+                    this.Data.FirstTransition,
+                    this.Data.TransitionCount);
 
             internal StateData Data => this.states[this.Index];
-
-            /// <summary>
-            /// Creates the copy of the array of outgoing transitions. Used by quoting.
-            /// </summary>
-            /// <returns>The copy of the array of outgoing transitions.</returns>
-            public Transition[] GetTransitions() => this.Data.GetTransitions();
 
             /// <summary>
             /// Compares 2 states for equality.
@@ -137,48 +129,6 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             public override int GetHashCode() => this.Data.GetHashCode();
 
             /// <summary>
-            /// Gets the transition at a specified index.
-            /// </summary>
-            /// <param name="index">The index of the transition.</param>
-            /// <returns>The transition.</returns>
-            public Transition GetTransition(int index) => this.Data.GetTransition(index);
-
-            /// <summary>
-            /// Replaces the transition at a given index with a given transition.
-            /// </summary>
-            /// <param name="index">The index of the transition to replace.</param>
-            /// <param name="updatedTransition">The transition to replace with.</param>
-            public void SetTransition(int index, Transition updatedTransition)
-            {
-                Argument.CheckIfInRange(index >= 0 && index < this.TransitionCount, "index", "An invalid transition index given.");
-                Argument.CheckIfValid(updatedTransition.DestinationStateIndex < this.Owner.States.Count, "updatedTransition", "The destination state index is not valid.");
-
-                if (updatedTransition.IsEpsilon)
-                {
-                    this.Owner.isEpsilonFree = false;
-                }
-                else
-                {
-                    this.Owner.isEpsilonFree = null;
-                }
-
-                var data = this.Data;
-                data.SetTransition(index, updatedTransition);
-                this.states[this.Index] = data;
-            }
-
-            /// <summary>
-            /// Removes the transition with a given index.
-            /// </summary>
-            /// <param name="index">The index of the transition to remove.</param>
-            public void RemoveTransition(int index)
-            {
-                var data = this.Data;
-                data.RemoveTransition(index);
-                this.states[this.Index] = data;
-            }
-
-            /// <summary>
             /// Returns a string that represents the state.
             /// </summary>
             /// <returns>A string that represents the state.</returns>
@@ -196,7 +146,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 }
 
                 bool firstTransition = true;
-                foreach (Transition transition in this.GetTransitions())
+                foreach (var transition in this.Transitions)
                 {
                     if (firstTransition)
                     {
@@ -401,11 +351,12 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             /// </summary>
             public bool HasIncomingTransitions
             {
+                // TODO: remove?
                 get
                 {
                     var this_ = this;
                     return this.Owner.States.Any(
-                        state => state.GetTransitions().Any(
+                        state => state.Transitions.Any(
                             transition => transition.DestinationStateIndex == this_.Index));
                 }
             }

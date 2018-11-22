@@ -12,6 +12,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
     using System.Text;
 
     using Microsoft.ML.Probabilistic.Collections;
+    using Microsoft.ML.Probabilistic.Core.Collections;
     using Microsoft.ML.Probabilistic.Distributions;
     using Microsoft.ML.Probabilistic.Math;
     using Microsoft.ML.Probabilistic.Utilities;

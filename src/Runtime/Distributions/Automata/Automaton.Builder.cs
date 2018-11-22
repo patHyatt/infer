@@ -7,6 +7,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
     using System;
     using System.Collections.Generic;
 
+    using Microsoft.ML.Probabilistic.Core.Collections;
     using Microsoft.ML.Probabilistic.Distributions;
     using Microsoft.ML.Probabilistic.Math;
     using Microsoft.ML.Probabilistic.Utilities;
@@ -58,7 +59,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             public StateBuilder AddState()
             {
                 var index = this.states.Count;
-                this.states.Add(new StateData {firstTransition = -1});
+                this.states.Add(new StateData {FirstTransition = -1});
                 return new StateBuilder(this, index);
             }
 
@@ -206,7 +207,9 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
 
                 public void SetEndWeight(Weight weight)
                 {
-                    this.builder.states[this.Index].EndWeight = weight;
+                    var state = this.builder.states[this.Index];
+                    state.EndWeight = weight;
+                    this.builder.states[this.Index] = state;
                 }
 
                 public StateBuilder AddTransition(Transition transition)
@@ -216,9 +219,11 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                         new LinkedTransition
                         {
                             transition = transition,
-                            next = this.builder.states[this.Index].firstTransition,
+                            next = this.builder.states[this.Index].FirstTransition,
                         });
-                    this.builder.states[this.Index].firstTransition = transitionIndex;
+                    var state = this.builder.states[this.Index];
+                    state.FirstTransition = transitionIndex;
+                    this.builder.states[this.Index] = state;
                     return new StateBuilder(this.builder, transition.DestinationStateIndex);
                 }
 

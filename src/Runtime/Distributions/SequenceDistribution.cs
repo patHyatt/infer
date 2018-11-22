@@ -1445,10 +1445,8 @@ namespace Microsoft.ML.Probabilistic.Distributions
             {
                 double logSample = Math.Log(Rand.Double());
                 Weight probSum = Weight.Zero;
-                for (int i = 0; i < currentState.TransitionCount; ++i)
+                foreach (var transition in currentState.Transitions)
                 {
-                    var transition = currentState.GetTransition(i);
-
                     probSum = Weight.Sum(probSum, transition.Weight);
                     if (logSample < probSum.LogValue)
                     {

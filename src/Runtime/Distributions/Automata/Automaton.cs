@@ -14,6 +14,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
 
     using Microsoft.ML.Probabilistic.Factors.Attributes;
     using Microsoft.ML.Probabilistic.Collections;
+    using Microsoft.ML.Probabilistic.Core.Collections;
     using Microsoft.ML.Probabilistic.Math;
     using Microsoft.ML.Probabilistic.Utilities;
     using Microsoft.ML.Probabilistic.Serialization;
@@ -813,9 +814,8 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             for (int stateIndex = 0; stateIndex < this.States.Count; stateIndex++)
             {
                 var state = this.States[stateIndex];
-                for (int transitionIndex = 0; transitionIndex < state.TransitionCount; transitionIndex++)
+                foreach (var transition in state.Transitions)
                 {
-                    Transition transition = state.GetTransition(transitionIndex);
                     if (transition.Group == group)
                     {
                         return true;
@@ -835,9 +835,8 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             for (int stateIndex = 0; stateIndex < this.States.Count; stateIndex++)
             {
                 var state = this.States[stateIndex];
-                for (int transitionIndex = 0; transitionIndex < state.TransitionCount; transitionIndex++)
+                foreach (var transition in state.Transitions)
                 {
-                    Transition transition = state.GetTransition(transitionIndex);
                     if (transition.Group != 0)
                     {
                         return true;
@@ -864,16 +863,18 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
         /// <param name="group">The specified group.</param>
         public void SetGroup(int group)
         {
+            throw new NotImplementedException();
+            /*
             for (int stateIndex = 0; stateIndex < this.States.Count; stateIndex++)
             {
                 var state = this.States[stateIndex];
-                for (int transitionIndex = 0; transitionIndex < state.TransitionCount; transitionIndex++)
+                foreach (var transition in state.Transitions)
                 {
-                    Transition transition = state.GetTransition(transitionIndex);
                     transition.Group = group;
                     state.SetTransition(transitionIndex, transition);
                 }
             }
+            */
         }
 
         #endregion

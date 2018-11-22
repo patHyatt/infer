@@ -9,6 +9,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
     using System.Diagnostics;
     using System.Linq;
 
+    using Microsoft.ML.Probabilistic.Core.Collections;
     using Microsoft.ML.Probabilistic.Distributions;
     using Microsoft.ML.Probabilistic.Math;
 
@@ -35,20 +36,19 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             /// TODO
             /// </summary>
             // TODO: ReadOnlyArray<StateData>
-            internal StateData[] states;
+            internal ReadOnlyArray<StateData> states;
 
             /// <summary>
             /// Initializes instance of <see cref="StateCollection"/>.
             /// </summary>
             internal StateCollection(
                 Automaton<TSequence, TElement, TElementDistribution, TSequenceManipulator, TThis> owner,
-                StateData[] states)
+                ReadOnlyArray<StateData> states)
             {
                 this.owner = owner;
                 this.states = states;
             }
 
-            
 /*
             /// <summary>
             /// Removes the state with a given index from the automaton.
@@ -97,7 +97,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             /// <summary>
             /// Gets number of states in collection.
             /// </summary>
-            public int Count => this.states.Length;
+            public int Count => this.states.Count;
 
             /// <summary>
             /// Returns enumerator over all states in collection.

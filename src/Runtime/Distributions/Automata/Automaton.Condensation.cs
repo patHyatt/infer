@@ -46,7 +46,6 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
         /// <returns>The computed condensation.</returns>
         public Condensation ComputeCondensation(State root, Func<Transition, bool> transitionFilter, bool useApproximateClosure)
         {
-            Argument.CheckIfValid(!root.IsNull, nameof(root));
             Argument.CheckIfNotNull(transitionFilter, nameof(transitionFilter));
             Argument.CheckIfValid(ReferenceEquals(root.Owner, this), nameof(root), "The given node belongs to a different automaton.");
 
@@ -108,7 +107,6 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             /// </param>
             internal Condensation(State root, Func<Transition, bool> transitionFilter, bool useApproximateClosure)
             {
-                Debug.Assert(!root.IsNull, "A valid root node must be provided.");
                 Debug.Assert(transitionFilter != null, "A valid transition filter must be provided.");
                 
                 this.Root = root;
@@ -183,7 +181,6 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             /// <returns>The computed total weight.</returns>
             public Weight GetWeightFromRoot(State state)
             {
-                Argument.CheckIfValid(!state.IsNull, nameof(state));
                 Argument.CheckIfValid(ReferenceEquals(state.Owner, this.Root.Owner), "state", "The given state belongs to a different automaton.");
 
                 if (!this.weightsFromRootComputed)
@@ -223,9 +220,8 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 stateIdStack.Push(currentState);
                 stateInfo.InStack = true;
 
-                for (int transitionIndex = 0; transitionIndex < currentState.TransitionCount; ++transitionIndex)
+                foreach (var transition in currentState.Transitions)
                 {
-                    Transition transition = currentState.GetTransition(transitionIndex);
                     if (!this.transitionFilter(transition))
                     {
                         continue;
@@ -279,9 +275,8 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
 
                         // Aggregate weights of all the outgoing transitions from this state
                         Weight weightToAdd = state.EndWeight;
-                        for (int transitionIndex = 0; transitionIndex < state.TransitionCount; ++transitionIndex)
+                        foreach (var transition in state.Transitions)
                         {
-                            Transition transition = state.GetTransition(transitionIndex);
                             State destState = state.Owner.States[transition.DestinationStateIndex];
                             if (this.transitionFilter(transition) && !currentComponent.HasState(destState))
                             {
@@ -358,9 +353,8 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                         }
 
                         // Aggregate weights of all the outgoing transitions from this state
-                        for (int transitionIndex = 0; transitionIndex < srcState.TransitionCount; ++transitionIndex)
+                        foreach (var transition in srcState.Transitions)
                         {
-                            Transition transition = srcState.GetTransition(transitionIndex);
                             State destState = srcState.Owner.States[transition.DestinationStateIndex];
                             if (this.transitionFilter(transition) && !currentComponent.HasState(destState))
                             {
