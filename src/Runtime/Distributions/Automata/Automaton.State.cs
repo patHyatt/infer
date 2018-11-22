@@ -232,9 +232,8 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
 
                 stateInStack.Add(this.Index, true);
 
-                for (int i = 0; i < this.TransitionCount; ++i)
+                foreach (var transition in this.Transitions)
                 {
-                    var transition = this.GetTransition(i);
                     if (transition.DestinationStateIndex != this.Index)
                     {
                         var destState = this.Owner.States[transition.DestinationStateIndex];
@@ -268,9 +267,9 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
 
                 var isZero = !this.CanEnd;
                 var transitionIndex = 0;
-                while (isZero && transitionIndex < this.TransitionCount)
+                while (isZero && transitionIndex < this.Transitions.Count)
                 {
-                    var transition = this.GetTransition(transitionIndex);
+                    var transition = this.Transitions[transitionIndex];
                     if (!transition.Weight.IsZero)
                     {
                         var destState = this.Owner.States[transition.DestinationStateIndex];
@@ -312,9 +311,8 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                         var closureState = closure.GetStateByIndex(closureStateIndex);
                         var closureStateWeight = closure.GetStateWeightByIndex(closureStateIndex);
 
-                        for (int transitionIndex = 0; transitionIndex < closureState.TransitionCount; transitionIndex++)
+                        foreach (var transition in closureState.Transitions)
                         {
-                            var transition = closureState.GetTransition(transitionIndex);
                             if (transition.IsEpsilon)
                             {
                                 continue; // The destination is a part of the closure anyway

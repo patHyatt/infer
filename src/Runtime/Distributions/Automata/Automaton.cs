@@ -965,7 +965,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
         /// </remarks>
         public bool IsCanonicZero()
         {
-            return this.Start.TransitionCount == 0 && this.Start.EndWeight.IsZero;
+            return this.Start.Transitions.Count == 0 && this.Start.EndWeight.IsZero;
         }
 
         /// <summary>
@@ -981,12 +981,12 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
         /// </remarks>
         public bool IsCanonicConstant()
         {
-            if (this.States.Count != 1 || this.Start.TransitionCount != 1 || !this.Start.CanEnd)
+            if (this.States.Count != 1 || this.Start.Transitions.Count != 1 || !this.Start.CanEnd)
             {
                 return false;
             }
 
-            var transitionDistribution = this.Start.GetTransition(0).ElementDistribution;
+            var transitionDistribution = this.Start.Transitions[0].ElementDistribution;
             return transitionDistribution.HasValue && transitionDistribution.Value.IsUniform();
         }
 
@@ -1108,10 +1108,9 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             for (int i = 0; i < this.States.Count; ++i)
             {
                 var oldState = this.States[i];
-                for (int j = 0; j < oldState.TransitionCount; ++j)
+                foreach (var oldTransition in oldState.Transitions)
                 {
                     // Result has original transitions reversed
-                    var oldTransition = oldState.GetTransition(j);
                     result[oldTransition.DestinationStateIndex].AddTransition(
                         oldTransition.ElementDistribution, oldTransition.Weight, i);
                 }
@@ -1302,9 +1301,8 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 productStateCache.Add(statePair, productState.Index);
 
                 // Iterate over transitions in state1
-                for (var transition1Index = 0; transition1Index < state1.TransitionCount; transition1Index++)
+                foreach (var transition1 in state1.Transitions)
                 {
-                    var transition1 = state1.GetTransition(transition1Index);
                     var destState1 = state1.Owner.States[transition1.DestinationStateIndex];
 
                     if (transition1.IsEpsilon)
@@ -1316,9 +1314,8 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                     }
 
                     // Iterate over transitions in state2
-                    for (int transition2Index = 0; transition2Index < state2.TransitionCount; transition2Index++)
+                    foreach (var transition2 in state2.Transitions)
                     {
-                        var transition2 = state2.GetTransition(transition2Index);
                         Debug.Assert(
                             !transition2.IsEpsilon,
                             "The second argument of the product operation must be epsilon-free.");
@@ -1648,9 +1645,8 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                     builder.StartStateIndex = thisState.Index;
                 }
 
-                for (int transitionIndex = 0; transitionIndex < otherState.TransitionCount; transitionIndex++)
+                foreach (var otherTransition in otherState.Transitions)
                 {
-                    var otherTransition = otherState.GetTransition(transitionIndex);
                     var transformedTransition = transitionTransform(otherTransition.ElementDistribution, otherTransition.Weight, otherTransition.Group);
                     builder[stateIndex].AddTransition(
                         transformedTransition.Item1,
@@ -1834,9 +1830,9 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                     this.isEpsilonFree = true;
                     foreach (var state in this.States)
                     {
-                        for (int i = 0; i < state.TransitionCount; i++)
+                        foreach (var transition in state.Transitions)
                         {
-                            if (state.GetTransition(i).IsEpsilon)
+                            if (transition.IsEpsilon)
                             {
                                 this.isEpsilonFree = false;
                                 break;
@@ -1912,9 +1908,8 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 {
                     var closureState = closure.GetStateByIndex(stateIndex);
                     var closureStateWeight = closure.GetStateWeightByIndex(stateIndex);
-                    for (var transitionIndex = 0; transitionIndex < closureState.TransitionCount; ++transitionIndex)
+                    foreach (var transition in closureState.Transitions)
                     {
-                        var transition = closureState.GetTransition(transitionIndex);
                         if (transition.IsEpsilon)
                         {
                             continue;
@@ -2001,9 +1996,8 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 {
                     State state = automaton.States[stateIndex];
                     Weight transitionWeightSum = Weight.Zero;
-                    for (int transitionIndex = 0; transitionIndex < state.TransitionCount; ++transitionIndex)
+                    foreach (var transition in state.Transitions)
                     {
-                        Transition transition = state.GetTransition(transitionIndex);
                         transitionWeightSum = Weight.Sum(transitionWeightSum, transition.Weight);
                     }
 
@@ -2047,9 +2041,8 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                     throw new ArgumentException("State indices must be consequent zero-based.");
                 }
 
-                for (int transitionIndex = 0; transitionIndex < stateArray[stateIndex].TransitionCount; ++transitionIndex)
+                foreach (var transition in state.Transitions)
                 {
-                    var transition = state.GetTransition(transitionIndex);
                     if (transition.DestinationStateIndex < 0 || transition.DestinationStateIndex >= stateArray.Length)
                     {
                         throw new ArgumentException("Transition destination indices must point to a valid state.");
@@ -2098,9 +2091,8 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             for (int i = 0; i < this.States.Count; ++i)
             {
                 var state = this.States[i];
-                for (int j = 0; j < state.TransitionCount; ++j)
+                foreach (var transition in state.Transitions)
                 {
-                    var transition = state.GetTransition(j);
                     if (!transition.Weight.IsZero)
                     {
                         ++edgePlacementIndices[transition.DestinationStateIndex + 1];
@@ -2122,9 +2114,8 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             for (int i = 0; i < this.States.Count; ++i)
             {
                 var state = this.States[i];
-                for (int j = 0; j < state.TransitionCount; ++j)
+                foreach (var transition in state.Transitions)
                 {
-                    var transition = state.GetTransition(j);
                     if (!transition.Weight.IsZero)
                     {
                         // The unique index for this edge
@@ -2162,9 +2153,8 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             for (int i = 0; i < this.States.Count; ++i)
             {
                 var state = this.States[i];
-                for (int j = 0; j < state.TransitionCount; ++j)
+                foreach (var transition in state.Transitions)
                 {
-                    var transition = state.GetTransition(j);
                     if (!transition.Weight.IsZero)
                     {
                         ++edgePlacementIndices[i + 1];
@@ -2186,9 +2176,8 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             for (int i = 0; i < this.States.Count; ++i)
             {
                 var state = this.States[i];
-                for (int j = 0; j < state.TransitionCount; ++j)
+                foreach (var transition in state.Transitions)
                 {
-                    var transition = state.GetTransition(j);
                     if (!transition.Weight.IsZero)
                     {
                         // The unique index for this edge
@@ -2312,10 +2301,8 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 }
             }
 
-            for (int i = 0; i < currentState.TransitionCount; ++i)
+            foreach (var transition in currentState.Transitions)
             {
-                Transition transition = currentState.GetTransition(i);
-
                 State destState = this.States[transition.DestinationStateIndex];
                 if (!isEndNodeReachable[destState.Index])
                 {
@@ -2397,7 +2384,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             visitedStates.Add(stateIndex);
 
             var currentState = this.States[stateIndex];
-            var transitions = currentState.GetTransitions().Where(t => !t.Weight.IsZero);
+            var transitions = currentState.Transitions.Where(t => !t.Weight.IsZero);
             var selfTransitions = transitions.Where(t => t.DestinationStateIndex == stateIndex);
             int selfTransitionCount = selfTransitions.Count();
             var nonSelfTransitions = transitions.Where(t => t.DestinationStateIndex != stateIndex);
@@ -2498,10 +2485,8 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             }
 
             visitedStates[stateIndex] = true;
-            for (int i = 0; i < currentState.TransitionCount; ++i)
+            foreach (var transition in currentState.Transitions)
             {
-                var transition = currentState.GetTransition(i);
-
                 if (transition.Weight.IsZero)
                 {
                     continue;
@@ -2566,10 +2551,8 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             }
 
             visitedStates[stateIndex] = true;
-            for (int i = 0; i < currentState.TransitionCount; ++i)
+            foreach (var transition in currentState.Transitions)
             {
-                var transition = currentState.GetTransition(i);
-
                 if (transition.Weight.IsZero)
                 {
                     continue;

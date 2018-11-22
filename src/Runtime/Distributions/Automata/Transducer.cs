@@ -178,9 +178,26 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
         /// <returns>The created transducer.</returns>
         public static TThis Transpose(TThis transducer)
         {
+            throw new NotImplementedException();
+
+            /*
+            for (int i = 0; i < this.sequencePairToWeight.States.Count; ++i)
+            {
+                var state = this.sequencePairToWeight.States[i];
+                foreach (var transition in state.Transitions)
+                {
+                    if (transition.ElementDistribution.HasValue)
+                    {
+                        transition.ElementDistribution = transition.ElementDistribution.Value.Transpose();
+                        state.SetTransition(j, transition);
+                    }
+                }
+            }
+
             TThis result = transducer.Clone();
             result.TransposeInPlace();
             return result;
+            */
         }
 
         /// <summary>
@@ -200,26 +217,6 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 automaton,
                 (elementDist, weight, group) => transitionTransform(elementDist.Value, weight));
             return result;
-        }
-
-        /// <summary>
-        /// Replaces the current transducer with its transpose (see <see cref="Transpose"/>).
-        /// </summary>
-        public void TransposeInPlace()
-        {
-            for (int i = 0; i < this.sequencePairToWeight.States.Count; ++i)
-            {
-                var state = this.sequencePairToWeight.States[i];
-                for (int j = 0; j < state.TransitionCount; ++j)
-                {
-                    var transition = state.GetTransition(j);
-                    if (transition.ElementDistribution.HasValue)
-                    {
-                        transition.ElementDistribution = transition.ElementDistribution.Value.Transpose();
-                        state.SetTransition(j, transition);
-                    }
-                }
-            }
         }
     }
 }

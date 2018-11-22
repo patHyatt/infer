@@ -47,23 +47,24 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             for (int stateId = 0; stateId < this.States.Count; ++stateId)
             {
                 var state = this.States[stateId];
-                
+
                 // There should be no epsilon transitions
-                for (int transitionIndex = 0; transitionIndex < state.TransitionCount; ++transitionIndex)
+                foreach (var transition in state.Transitions)
                 {
-                    if (state.GetTransition(transitionIndex).IsEpsilon)
+                    if (transition.IsEpsilon)
                     {
                         return false;
                     }
                 }
                 
                 // Element distributions should not intersect
-                for (int transitionIndex1 = 0; transitionIndex1 < state.TransitionCount; ++transitionIndex1)
+                var transitions = state.Transitions;
+                for (int transitionIndex1 = 0; transitionIndex1 < transitions.Count; ++transitionIndex1)
                 {
-                    var transition1 = state.GetTransition(transitionIndex1);
-                    for (int transitionIndex2 = transitionIndex1 + 1; transitionIndex2 < state.TransitionCount; ++transitionIndex2)
+                    var transition1 = transitions[transitionIndex1];
+                    for (int transitionIndex2 = transitionIndex1 + 1; transitionIndex2 < transitions.Count; ++transitionIndex2)
                     {
-                        var transition2 = state.GetTransition(transitionIndex2);
+                        var transition2 = transitions[transitionIndex2];
                         double logProductNormalizer = transition1.ElementDistribution.Value.GetLogAverageOf(transition2.ElementDistribution.Value);
                         if (!double.IsNegativeInfinity(logProductNormalizer))
                         {

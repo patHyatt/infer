@@ -42,14 +42,11 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             /// <param name="state">The state, which epsilon closure this instance will represent.</param>
             internal EpsilonClosure(State state)
             {
-                Argument.CheckIfValid(!state.IsNull, nameof(state));
-
                 // Optimize for a very common case: a single-node closure
                 bool singleNodeClosure = true;
                 Weight selfLoopWeight = Weight.Zero;
-                for (int i = 0; i < state.TransitionCount; ++i)
+                foreach (var transition in state.Transitions)
                 {
-                    Transition transition = state.GetTransition(i);
                     if (transition.IsEpsilon)
                     {
                         if (transition.DestinationStateIndex != state.Index)

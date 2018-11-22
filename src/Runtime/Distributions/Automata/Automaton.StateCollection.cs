@@ -35,18 +35,21 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             /// <summary>
             /// TODO
             /// </summary>
-            // TODO: ReadOnlyArray<StateData>
             internal ReadOnlyArray<StateData> states;
+
+            internal ReadOnlyArray<Transition> transitions;
 
             /// <summary>
             /// Initializes instance of <see cref="StateCollection"/>.
             /// </summary>
             internal StateCollection(
                 Automaton<TSequence, TElement, TElementDistribution, TSequenceManipulator, TThis> owner,
-                ReadOnlyArray<StateData> states)
+                ReadOnlyArray<StateData> states,
+                ReadOnlyArray<Transition> transitions)
             {
                 this.owner = owner;
                 this.states = states;
+                this.transitions = transitions;
             }
 
 /*
@@ -92,7 +95,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             /// <summary>
             /// Gets state by its index.
             /// </summary>
-            public State this[int index] => new State(this.owner, this.states, index);
+            public State this[int index] => new State(this.owner, this.states, this.transitions, index);
 
             /// <summary>
             /// Gets number of states in collection.
@@ -107,7 +110,8 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 // TODO: optimize?
                 var owner = this.owner;
                 var states = this.states;
-                return this.states.Select((data, index) => new State(owner, states, index)).GetEnumerator();
+                var transitions = this.transitions;
+                return this.states.Select((data, index) => new State(owner, states, transitions, index)).GetEnumerator();
             }
 
             /// <summary>

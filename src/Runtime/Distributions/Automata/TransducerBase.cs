@@ -360,9 +360,8 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 destStateCache.Add(statePair, destState.Index);
 
                 // Iterate over transitions from mappingState
-                for (var mappingTransitionIndex = 0; mappingTransitionIndex < mappingState.TransitionCount; mappingTransitionIndex++)
+                foreach (var mappingTransition in mappingState.Transitions)
                 {
-                    var mappingTransition = mappingState.GetTransition(mappingTransitionIndex);
                     var childMappingState = mappingState.Owner.States[mappingTransition.DestinationStateIndex];
 
                     // Epsilon transition case
@@ -378,9 +377,8 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                     }
 
                     // Iterate over states and transitions in the closure of srcState
-                    for (var srcTransitionIndex = 0; srcTransitionIndex < srcState.TransitionCount; srcTransitionIndex++)
+                    foreach (var srcTransition in srcState.Transitions)
                     {
-                        var srcTransition = srcState.GetTransition(srcTransitionIndex);
                         Debug.Assert(!srcTransition.IsEpsilon, "The automaton being projected must be epsilon-free.");
                         
                         var srcChildState = srcState.Owner.States[srcTransition.DestinationStateIndex];
@@ -451,9 +449,8 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 var srcSequenceLength = sourceSequenceManipulator.GetLength(srcSequence);
 
                 // Enumerate transitions from the current mapping state
-                for (var i = 0; i < mappingState.TransitionCount; i++)
+                foreach (var mappingTransition in mappingState.Transitions)
                 {
-                    var mappingTransition = mappingState.GetTransition(i);
                     var destMappingState = mappingState.Owner.States[mappingTransition.DestinationStateIndex];
 
                     // Epsilon transition case

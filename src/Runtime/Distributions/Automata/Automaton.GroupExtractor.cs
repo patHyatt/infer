@@ -45,9 +45,8 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 {
                     var newSourceState = stateMapping[stateIndex];
 
-                    for (int i = 0; i < states[stateIndex].TransitionCount; i++)
+                    foreach (var transition in states[stateIndex].Transitions)
                     {
-                        var transition = states[stateIndex].GetTransition(i);
                         if (transition.Group != group)
                         {
                             continue;
@@ -132,9 +131,8 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 var state = states[stateIdx];
 
                 temporary[stateIdx] = true;
-                for (var i = 0; i < state.TransitionCount; i++)
+                foreach (var transition in state.Transitions)
                 {
-                    var transition = state.GetTransition(i);
                     var group = transition.Group;
                     if (group != 0)
                     {
@@ -172,10 +170,8 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                     var state = topologicalOrder[stateIndex];
                     // Aggregate weights of all the outgoing transitions from this state
                     var weightToAdd = state.EndWeight;
-                    for (var transitionIndex = 0; transitionIndex < state.TransitionCount; ++transitionIndex)
+                    foreach (var transition in state.Transitions)
                     {
-                        var transition = state.GetTransition(transitionIndex);
-
                         if (transition.Group == group) continue;
 
                         weightToAdd = Weight.Sum(
@@ -211,10 +207,8 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                     }
 
                     // Aggregate weights of all the outgoing transitions from this state
-                    for (var transitionIndex = 0; transitionIndex < srcState.TransitionCount; transitionIndex++)
+                    foreach (var transition in srcState.Transitions)
                     {
-                        var transition = srcState.GetTransition(transitionIndex);
-
                         if (transition.Group == group) continue;
 
                         var destWeight = weights[transition.DestinationStateIndex];
