@@ -67,7 +67,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                     var newSourceState = stateMapping[stateIndex];
 
                     // consider start states
-                    var weightFromRoot = newSourceState.TransitionCount > 0 ? weightsFromRoot[stateIndex] : Weight.Zero;
+                    var weightFromRoot = newSourceState.HasTransitions ? weightsFromRoot[stateIndex] : Weight.Zero;
                     if (!weightFromRoot.IsZero)
                     {
                         subautomaton.Start.AddEpsilonTransition(weightFromRoot, newSourceState.Index);

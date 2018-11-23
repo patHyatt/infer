@@ -297,7 +297,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
 
                 public Weight EndWeight => this.builder.states[this.Index].EndWeight;
 
-                public int TransitionCount => throw new NotImplementedException();
+                public bool HasTransitions => this.builder.states[this.Index].FirstTransition != -1;
 
                 internal StateBuilder(Builder builder, int index)
                 {
@@ -452,23 +452,35 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 }
 
                 public TransitionIterator TransitionIterator =>
-                    throw new NotImplementedException();
+                    new TransitionIterator(this.builder, this.builder.states[this.Index].FirstTransition);
             }
 
             public struct TransitionIterator
             {
+                private readonly Builder builder;
+                private int index;
+
+                public TransitionIterator(Builder builder, int index)
+                {
+                    this.builder = builder;
+                    this.index = index;
+                }
+
                 public Transition Value
                 {
-                    get => throw new NotImplementedException();
-                    set => throw new NotImplementedException();
+                    get => this.builder.transitions[this.index].transition;
+                    set
+                    {
+                        var linked = this.builder.transitions[this.index];
+                        linked.transition = value;
+                        this.builder.transitions[this.index] = linked;
+                    }
                 }
 
-                public bool Ok => throw new NotImplementedException();
+                public bool Ok => this.index != -1;
 
-                public void Next()
-                {
-                    throw new NotImplementedException();
-                }
+                public void Next() =>
+                    this.index = this.builder.transitions[this.index].next;
             }
 
             private struct LinkedTransition
