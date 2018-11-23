@@ -186,7 +186,16 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
 
             public TThis GetAutomaton()
             {
-                throw new NotImplementedException();
+                var result = new TThis();
+
+                var transitions = new Transition[this.transitions.Count];
+                for (var i = 0; i < transitions.Length; ++i)
+                {
+                    transitions[i] = this.transitions[i].transition;
+                }
+
+                result.stateCollection = new StateCollection(result, this.states.ToArray(), transitions);
+                return result;
             }
 
             public struct StateBuilder
