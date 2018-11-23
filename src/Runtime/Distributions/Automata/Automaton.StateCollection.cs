@@ -12,6 +12,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
     using Microsoft.ML.Probabilistic.Core.Collections;
     using Microsoft.ML.Probabilistic.Distributions;
     using Microsoft.ML.Probabilistic.Math;
+    using Microsoft.ML.Probabilistic.Utilities;
 
     public abstract partial class Automaton<TSequence, TElement, TElementDistribution, TSequenceManipulator, TThis>
         where TSequence : class, IEnumerable<TElement>
@@ -127,6 +128,13 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             public void SetTo(StateCollection that)
             {
                 this.states = that.states;
+                this.transitions = that.transitions;
+            }
+
+            public void SwapWith(ref StateCollection that)
+            {
+                Util.Swap(ref this.states, ref that.states);
+                Util.Swap(ref this.transitions, ref that.transitions);
             }
         }
     }

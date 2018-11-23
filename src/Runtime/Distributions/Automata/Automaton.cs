@@ -2357,8 +2357,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             Debug.Assert(automaton != null, "A valid automaton must be provided.");
 
             // Swap contents
-            Util.Swap(ref this.stateCollection.states, ref automaton.stateCollection.states);
-            Util.Swap(ref this.stateCollection.transitions, ref automaton.stateCollection.transitions);
+            this.stateCollection.SwapWith(ref automaton.stateCollection);
             Util.Swap(ref this.startStateIndex, ref automaton.startStateIndex);
             Util.Swap(ref this.isEpsilonFree, ref automaton.isEpsilonFree);
             var dummy = this.LogValueOverride;
