@@ -1600,7 +1600,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
 
             if (!ReferenceEquals(this, automaton))
             {
-                this.States.SetTo(automaton.States);
+                this.stateCollection.SetTo(automaton.stateCollection);
                 this.startStateIndex = automaton.startStateIndex;
                 this.isEpsilonFree = automaton.isEpsilonFree;
                 this.LogValueOverride = automaton.LogValueOverride;
