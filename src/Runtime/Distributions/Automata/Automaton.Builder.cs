@@ -186,6 +186,14 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
 
             public TThis GetAutomaton()
             {
+                var result = new TThis();
+                result.stateCollection = this.GetStateCollection(result);
+                result.startStateIndex = this.StartStateIndex;
+                return result;
+            }
+
+            internal StateCollection GetStateCollection(TThis owner)
+            {
                 if (this.StartStateIndex < 0 || this.StartStateIndex >= this.states.Count)
                 {
                     throw new InvalidOperationException(
@@ -213,9 +221,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                     resultStates[i] = state;
                 }
 
-                var result = new TThis();
-                result.stateCollection = new StateCollection(result, this.states.ToArray(), resultTransitions);
-                return result;
+                return new StateCollection(owner, this.states.ToArray(), resultTransitions);
             }
 
             public struct StateBuilder

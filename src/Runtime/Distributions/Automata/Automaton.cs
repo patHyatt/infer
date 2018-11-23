@@ -2648,18 +2648,19 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
         /// <summary>
         /// Writes the current automaton.
         /// </summary>
+        /// <remarks>
+        /// Serializtion format is a bit unnatural, but we do it for compatiblity with old serialized data.
+        /// So we don't have to maintain 2 versions of derserialization
+        /// </remarks>
         public void Write(Action<double> writeDouble, Action<int> writeInt32, Action<TElementDistribution> writeElementDistribution)
         {
-            throw new NotImplementedException();
-
-            /*
             var propertyMask = new BitVector32();
             var idx = 0;
             propertyMask[1 << idx++] = this.isEpsilonFree.HasValue;
             propertyMask[1 << idx++] = this.isEpsilonFree.HasValue && this.isEpsilonFree.Value;
             propertyMask[1 << idx++] = this.LogValueOverride.HasValue;
             propertyMask[1 << idx++] = this.PruneTransitionsWithLogWeightLessThan.HasValue;
-            propertyMask[1 << idx++] = !this.Start.IsNull;
+            propertyMask[1 << idx++] = true; // start state is alway serialized
 
             writeInt32(propertyMask.Data);
 
@@ -2673,27 +2674,25 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 writeDouble(this.PruneTransitionsWithLogWeightLessThan.Value);
             }
 
-            if (!this.Start.IsNull)
-            {
-                this.Start.Write(writeInt32, writeDouble, writeElementDistribution);
-            }
-
+            // This state is serialized only for its index.
+            this.Start.Write(writeDouble, writeInt32, writeElementDistribution);
+            
             writeInt32(this.States.Count);
             foreach (var state in this.States)
             {
-                state.Write(writeInt32, writeDouble, writeElementDistribution);
+                state.Write(writeDouble, writeInt32, writeElementDistribution);
             }
-            */
         }
 
         /// <summary>
         /// Reads an automaton from.
         /// </summary>
+        /// <remarks>
+        /// Serializtion format is a bit unnatural, but we do it for compatiblity with old serialized data.
+        /// So we don't have to maintain 2 versions of derserialization
+        /// </remarks>
         public static TThis Read(Func<double> readDouble, Func<int> readInt32, Func<TElementDistribution> readElementDistribution)
         {
-            throw new NotImplementedException();
-
-            /*
             var propertyMask = new BitVector32(readInt32());
             var res = new TThis();
             var idx = 0;
@@ -2715,27 +2714,27 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 res.PruneTransitionsWithLogWeightLessThan = readDouble();
             }
 
-            var startState =
-                hasStartState
-                    ? State.Read(readInt32, readDouble, readElementDistribution)
-                    : default(State);
-
-            var numStates = readInt32();
-
-            var states = new List<StateData> { Capacity = numStates };
-            for (var i = 0; i < numStates; i++)
-            {
-                states.Add(State.Read(readInt32, readDouble, readElementDistribution).Data);
-            }
-            res.stateCollection = new StateCollection(res, states);
+            var builder = new Builder();
 
             if (hasStartState)
             {
-                res.startStateIndex = startState.Index;
+                // Start state is also present in the list of all states, so read it into temp builder where
+                // it will get index 0. But keep real deserialized start state index to be used in real builder
+                var tempBuilder = new Builder();
+                builder.StartStateIndex =
+                    State.ReadTo(ref tempBuilder, readInt32, readDouble, readElementDistribution, checkIndex: false);
             }
 
+            var numStates = readInt32();
+            
+            for (var i = 0; i < numStates; i++)
+            {
+                State.ReadTo(ref builder, readInt32, readDouble, readElementDistribution);
+            }
+
+            res.stateCollection = builder.GetStateCollection(res);
+
             return res;
-            */
         }
         #endregion
     }

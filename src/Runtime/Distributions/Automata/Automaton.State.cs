@@ -358,6 +358,55 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                             transition => transition.DestinationStateIndex == this_.Index));
                 }
             }
+
+            #region Serialization
+
+            public void Write(Action<double> writeDouble, Action<int> writeInt32, Action<TElementDistribution> writeElementDistribution)
+            {
+                this.EndWeight.Write(writeDouble);
+                writeInt32(this.Index);
+                writeInt32(this.Transitions.Count);
+                foreach (var transition in this.Transitions)
+                {
+                    transition.Write(writeInt32, writeDouble, writeElementDistribution);
+                }
+            }
+
+            /// <summary>
+            /// Reads state and appends it into Automaton builder. Returns index in the serialized data.
+            /// If <paramref name="checkIndex"/> is true, will throw exception if serialized index
+            /// does not match index in deserialized states array. This check is bypassed only when
+            /// start state is serialized second time.
+            /// </summary>
+            public static int ReadTo(
+                ref Builder builder,
+                Func<int> readInt32,
+                Func<double> readDouble,
+                Func<TElementDistribution> readElementDistribution,
+                bool checkIndex = false)
+            {
+                var endWeight = Weight.Read(readDouble);
+                // Note: index is serialized for compatibility with old binary serializations
+                var index = readInt32();
+
+                if (checkIndex && index != builder.StatesCount)
+                {
+                    throw new Exception("Index in serialized data does not match index in deserialized array");
+                }
+
+                var state = builder.AddState();
+                state.SetEndWeight(endWeight);
+
+                var transitionCount = readInt32();
+                for (var i = 0; i < transitionCount; i++)
+                {
+                    state.AddTransition(Transition.Read(readInt32, readDouble, readElementDistribution));
+                }
+
+                return index;
+            }
+
+            #endregion
         }
     }
 }
