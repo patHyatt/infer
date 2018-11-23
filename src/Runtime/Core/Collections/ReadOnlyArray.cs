@@ -4,15 +4,20 @@
 
 namespace Microsoft.ML.Probabilistic.Core.Collections
 {
+    using System;
     using System.Collections;
     using System.Collections.Generic;
+    using System.Runtime.Serialization;
 
     /// <summary>
     /// Represents a read only array. Having it as a struct avoids allocations on heap
     /// and helps devirtualizing calls at call sites.
     /// </summary>
+    [Serializable]
+    [DataContract]
     public struct ReadOnlyArray<T> : IReadOnlyList<T>
     {
+        [DataMember]
         private readonly T[] array;
 
         /// <summary>
