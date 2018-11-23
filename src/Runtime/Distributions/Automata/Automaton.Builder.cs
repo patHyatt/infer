@@ -186,15 +186,29 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
 
             public TThis GetAutomaton()
             {
-                var result = new TThis();
+                var resultStates = new StateData[this.states.Count];
+                var resultTransitions = new Transition[this.transitions.Count];
+                var nextResultTransitionIndex = 0;
 
-                var transitions = new Transition[this.transitions.Count];
-                for (var i = 0; i < transitions.Length; ++i)
+                for (var i = 0; i < resultStates.Length; ++i)
                 {
-                    transitions[i] = this.transitions[i].transition;
+                    var state = this.states[i];
+                    var transitionCount = 0;
+                    var transitionIndex = state.FirstTransition;
+                    state.FirstTransition = nextResultTransitionIndex;
+                    while (transitionIndex != -1)
+                    {
+                        resultTransitions[nextResultTransitionIndex] = this.transitions[transitionIndex].transition;
+                        ++nextResultTransitionIndex;
+                        ++transitionCount;
+                        transitionIndex = this.transitions[transitionIndex].next;
+                    }
+                    state.TransitionCount = transitionCount;
+                    resultStates[i] = state;
                 }
 
-                result.stateCollection = new StateCollection(result, this.states.ToArray(), transitions);
+                var result = new TThis();
+                result.stateCollection = new StateCollection(result, this.states.ToArray(), resultTransitions);
                 return result;
             }
 

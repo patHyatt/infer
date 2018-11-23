@@ -96,6 +96,10 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
         /// </summary>
         private bool? isEpsilonFree; // TODO: Isn't it always known?
 
+        private static ReadOnlyArray<StateData> zeroStates = new[] { new StateData(0, 0, Weight.Zero) };
+
+        private static ReadOnlyArray<Transition> zeroTransitions = new Transition[] { };
+
         #endregion
 
         #region Constructors
@@ -242,11 +246,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
         /// Creates an automaton which maps every sequence to zero.
         /// </summary>
         /// <returns>The created automaton.</returns>
-        public static TThis Zero()
-        {
-            var result = new TThis();
-            return result;
-        }
+        public static TThis Zero() => new TThis();
 
         /// <summary>
         /// Creates an automaton which maps every sequence to a given value.
@@ -1528,8 +1528,10 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
         /// <summary>
         /// Replaces the current automaton with an automaton which is zero everywhere.
         /// </summary>
-        public void SetToZero() =>
-            this.SwapWith(Builder.Zero().GetAutomaton());
+        public void SetToZero()
+        {
+            this.stateCollection = new StateCollection(this, zeroStates, zeroTransitions);
+        }
 
         /// <summary>
         /// Replaces the current automaton with an automaton which maps every sequence to a given value.
