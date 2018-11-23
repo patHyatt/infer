@@ -177,9 +177,11 @@ namespace Microsoft.ML.Probabilistic.Tests
         [Trait("Category", "StringInference")]
         public void ProductWithGroups()
         {
+            throw new NotImplementedException();
+            /*
             StringDistribution lhsWithoutGroup = StringDistribution.String("ab");
             var weightFunction = lhsWithoutGroup.GetWorkspaceOrPoint();
-            var transitionWithGroup = weightFunction.Start.GetTransitions()[0];
+            var transitionWithGroup = weightFunction.Start.Transitions[0];
             transitionWithGroup.Group = 1;
             weightFunction.Start.SetTransition(0, transitionWithGroup);
             StringDistribution lhs = StringDistribution.FromWeightFunction(weightFunction);
@@ -189,6 +191,7 @@ namespace Microsoft.ML.Probabilistic.Tests
             var result = StringDistribution.Zero();
             result.SetToProduct(lhs, rhs);
             Assert.True(result.GetWorkspaceOrPoint().HasGroup(1));
+            */
         }
 
         /// <summary>
@@ -577,11 +580,11 @@ namespace Microsoft.ML.Probabilistic.Tests
             const double StoppingProbability = 0.7;
 
             // The length of sequences sampled from this distribution must follow a geometric distribution
-            StringAutomaton automaton = StringAutomaton.Zero();
-            automaton.Start = automaton.AddState();
-            automaton.Start.SetEndWeight(Weight.FromValue(StoppingProbability));
-            automaton.Start.AddTransition('a', Weight.FromValue(1 - StoppingProbability), automaton.Start);
-            StringDistribution dist = StringDistribution.FromWeightFunction(automaton);
+            var builder = StringAutomaton.Builder.Zero();
+            builder.StartStateIndex = builder.AddState().Index;
+            builder.Start.SetEndWeight(Weight.FromValue(StoppingProbability));
+            builder.Start.AddTransition('a', Weight.FromValue(1 - StoppingProbability), builder.Start.Index);
+            StringDistribution dist = StringDistribution.FromWeightFunction(builder.GetAutomaton());
 
             var acc = new MeanVarianceAccumulator();
             const int SampleCount = 30000;

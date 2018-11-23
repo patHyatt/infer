@@ -27,6 +27,8 @@ namespace Microsoft.ML.Probabilistic.Tests
         [Trait("Category", "StringInference")]
         public void GetOutgoingTransitionsForDeterminization1()
         {
+            throw new NotImplementedException();
+            /*
             var wrapper = new StringAutomatonWrapper();
             wrapper.Start.AddTransition(DiscreteChar.Uniform(), Weight.FromValue(2));
             
@@ -39,6 +41,7 @@ namespace Microsoft.ML.Probabilistic.Tests
             };
 
             AssertCollectionsEqual(expectedOutgoingTransitions, outgoingTransitions, TransitionInfoEqualityComparer.Instance);
+            */
         }
 
         /// <summary>
@@ -49,6 +52,8 @@ namespace Microsoft.ML.Probabilistic.Tests
         [Trait("Category", "StringInference")]
         public void GetOutgoingTransitionsForDeterminization2()
         {
+            throw new NotImplementedException();
+            /*
             var wrapper = new StringAutomatonWrapper();
             wrapper.Start.AddTransition(DiscreteChar.UniformInRange('a', 'z'), Weight.FromValue(2));
             wrapper.Start.AddTransition(DiscreteChar.UniformInRanges('a', 'z', 'A', 'Z'), Weight.FromValue(3));
@@ -64,6 +69,7 @@ namespace Microsoft.ML.Probabilistic.Tests
             };
 
             AssertCollectionsEqual(expectedOutgoingTransitions, outgoingTransitions, TransitionInfoEqualityComparer.Instance);
+            */
         }
 
         /// <summary>
@@ -74,6 +80,8 @@ namespace Microsoft.ML.Probabilistic.Tests
         [Trait("Category", "StringInference")]
         public void GetOutgoingTransitionsForDeterminization3()
         {
+            throw new NotImplementedException();
+            /*
             var wrapper = new StringAutomatonWrapper();
             wrapper.Start.AddTransition(DiscreteChar.UniformInRange('a', 'b'), Weight.FromValue(2));
             wrapper.Start.AddTransition(DiscreteChar.UniformInRanges('b', 'd'), Weight.FromValue(3));
@@ -107,6 +115,7 @@ namespace Microsoft.ML.Probabilistic.Tests
             };
 
             AssertCollectionsEqual(expectedOutgoingTransitions, outgoingTransitions, TransitionInfoEqualityComparer.Instance);
+            */
         }
 
         /// <summary>
@@ -117,6 +126,8 @@ namespace Microsoft.ML.Probabilistic.Tests
         [Trait("Category", "StringInference")]
         public void GetOutgoingTransitionsForDeterminization4()
         {
+            throw new NotImplementedException();
+            /*
             var wrapper = new StringAutomatonWrapper();
             wrapper.Start.AddTransition(DiscreteChar.UniformInRange(char.MinValue, char.MaxValue), Weight.FromValue(2));
             wrapper.Start.AddTransition(DiscreteChar.UniformInRange('a', char.MaxValue), Weight.FromValue(3));
@@ -157,12 +168,15 @@ namespace Microsoft.ML.Probabilistic.Tests
             };
 
             AssertCollectionsEqual(expectedOutgoingTransitions, outgoingTransitions, TransitionInfoEqualityComparer.Instance);
+            */
         }
 
         [Fact]
         [Trait("Category", "StringInference")]
         public void GetOutgoingTrainsitionsForDeterminization5()
         {
+            throw new NotImplementedException();
+            /*
             var wrapper = new StringAutomatonWrapper();
 
             wrapper.Start.AddTransition('A', Weight.FromValue(2.49999999999995));
@@ -180,6 +194,7 @@ namespace Microsoft.ML.Probabilistic.Tests
 
             Assert.Equal(5, outgoingTransitions.Length);
             Assert.True(outgoingTransitions.All(ot => ot.Item1.IsPointMass));
+            */
         }
         #endregion
 

@@ -35,6 +35,8 @@ namespace Microsoft.ML.Probabilistic.Tests
         {
             Assert.Timeout(() =>
             {
+                throw new NotImplementedException();
+                /*
                 StringAutomaton automaton = StringAutomaton.Zero();
                 var nextState = automaton.Start.AddTransitionsForSequence("abc");
                 nextState.AddSelfTransition('d', Weight.FromValue(0.1));
@@ -42,6 +44,7 @@ namespace Microsoft.ML.Probabilistic.Tests
                 nextState.AddTransitionsForSequence("hejfhoenmf").SetEndWeight(Weight.One);
 
                 ProfileAction(() => automaton.GetLogNormalizer(), 100000);
+                */
             }, 10000);
         }
 
@@ -55,6 +58,8 @@ namespace Microsoft.ML.Probabilistic.Tests
         {
             Assert.Timeout(() =>
             {
+                throw new NotImplementedException();
+                /*
                 StringAutomaton automaton = StringAutomaton.Zero();
                 var nextState = automaton.Start.AddTransitionsForSequence("abc");
                 nextState.SetEndWeight(Weight.One);
@@ -67,6 +72,7 @@ namespace Microsoft.ML.Probabilistic.Tests
                 nextState.AddSelfTransition('h', Weight.FromValue(0.3));
 
                 ProfileAction(() => automaton.GetLogNormalizer(), 100000);
+                */
             }, 20000);
         }
 
@@ -80,6 +86,8 @@ namespace Microsoft.ML.Probabilistic.Tests
         {
             Assert.Timeout(() =>
             {
+                throw new NotImplementedException();
+                /*
                 StringAutomaton automaton = StringAutomaton.Zero();
                 automaton.Start.AddSelfTransition('a', Weight.FromValue(0.5));
                 automaton.Start.SetEndWeight(Weight.One);
@@ -93,6 +101,7 @@ namespace Microsoft.ML.Probabilistic.Tests
                 }
 
                 ProfileAction(() => automaton.GetLogNormalizer(), 100);
+                */
             }, 120000);
         }
         
