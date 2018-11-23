@@ -186,6 +186,12 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
 
             public TThis GetAutomaton()
             {
+                if (this.StartStateIndex < 0 || this.StartStateIndex >= this.states.Count)
+                {
+                    throw new InvalidOperationException(
+                        $"Build automaton must have a valid start state. StartStateIndex = {this.StartStateIndex}, states.Count = {this.states.Count}");
+                }
+
                 var resultStates = new StateData[this.states.Count];
                 var resultTransitions = new Transition[this.transitions.Count];
                 var nextResultTransitionIndex = 0;
