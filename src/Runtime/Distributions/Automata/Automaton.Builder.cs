@@ -59,9 +59,11 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             public StateBuilder AddState()
             {
                 var index = this.states.Count;
-                this.states.Add(new StateData {FirstTransition = -1});
+                this.states.Add(new StateData { FirstTransition = -1 });
                 return new StateBuilder(this, index);
             }
+
+            public StateBuilder GetState(int index) => new StateBuilder(this, index);
 
             public void AddStates(int count)
             {

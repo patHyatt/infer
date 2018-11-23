@@ -111,6 +111,8 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
         /// <remarks>See <a href="http://www.cs.nyu.edu/~mohri/pub/hwa.pdf"/> for algorithm details.</remarks>
         public bool TryDeterminize(int maxStatesBeforeStop)
         {
+            return false;
+            /*
             Argument.CheckIfInRange(
                 maxStatesBeforeStop > 0 && maxStatesBeforeStop <= MaxStateCount,
                 "maxStatesBeforeStop",
@@ -131,19 +133,20 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             // Weighted state set is a set of (stateId, weight) pairs, where state ids correspond to states of the original automaton..
             // Such pairs correspond to states of the resulting automaton.
             var weightedStateSetQueue = new Queue<Determinization.WeightedStateSet>();
-            var weightedStateSetToNewState = new Dictionary<Determinization.WeightedStateSet, State>();
-            var result = Zero();
+            var weightedStateSetToNewState = new Dictionary<Determinization.WeightedStateSet, int>();
+            var result = Builder.Zero();
 
             var startWeightedStateSet = new Determinization.WeightedStateSet { { this.Start.Index, Weight.One } };
             weightedStateSetQueue.Enqueue(startWeightedStateSet);
-            weightedStateSetToNewState.Add(startWeightedStateSet, result.Start);
+            weightedStateSetToNewState.Add(startWeightedStateSet, result.StartStateIndex);
             result.Start.SetEndWeight(this.Start.EndWeight);
 
             while (weightedStateSetQueue.Count > 0)
             {
                 // Take one unprocessed state of the resulting automaton
                 Determinization.WeightedStateSet currentWeightedStateSet = weightedStateSetQueue.Dequeue();
-                var currentState = weightedStateSetToNewState[currentWeightedStateSet];
+                var currentStateIndex = weightedStateSetToNewState[currentWeightedStateSet];
+                var currentState = result.GetState(currentStateIndex);
 
                 // Find out what transitions we should add for this state
                 IEnumerable<Tuple<TElementDistribution, Weight, Determinization.WeightedStateSet>> outgoingTransitionInfos =
@@ -156,18 +159,18 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                     Weight weight = outgoingTransitionInfo.Item2;
                     Determinization.WeightedStateSet destWeightedStateSet = outgoingTransitionInfo.Item3;
 
-                    State destinationState;
-                    if (!weightedStateSetToNewState.TryGetValue(destWeightedStateSet, out destinationState))
+                    int destinationStateIndex;
+                    if (!weightedStateSetToNewState.TryGetValue(destWeightedStateSet, out destinationStateIndex))
                     {
-                        if (result.States.Count == maxStatesBeforeStop)
+                        if (result.StatesCount == maxStatesBeforeStop)
                         {
                             // Too many states, determinization attempt failed
                             return false;
                         }
 
                         // Add new state to the result
-                        destinationState = result.AddState();
-                        weightedStateSetToNewState.Add(destWeightedStateSet, destinationState);
+                        var destinationState = result.AddState();
+                        weightedStateSetToNewState.Add(destWeightedStateSet, destinationState.Index);
                         weightedStateSetQueue.Enqueue(destWeightedStateSet);
 
                         // Compute its ending weight
@@ -178,10 +181,12 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                                 destinationState.EndWeight,
                                 Weight.Product(stateIdWithWeight.Value, this.States[stateIdWithWeight.Key].EndWeight)));
                         }
+
+                        destinationStateIndex = destinationState.Index;
                     }
 
                     // Add transition to the destination state
-                    currentState.AddTransition(elementDistribution, weight, destinationState);
+                    currentState.AddTransition(elementDistribution, weight, destinationStateIndex);
                 }
             }
 
@@ -190,12 +195,18 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             ////    writer.WriteLine(result.ToString(AutomatonFormats.GraphViz));
             ////}
 
+            */
+
+            // TODO
+            /*
             result.MergeParallelTransitions(); // Determinization produces a separate transition for each segment
             result.PruneTransitionsWithLogWeightLessThan = this.PruneTransitionsWithLogWeightLessThan;
             result.LogValueOverride = this.LogValueOverride;
             // Determinization was successful, we can replace the current automaton with its deterministic version
             this.SwapWith(result);
-            return true;
+            */
+
+            //return true;
         }
 
         /// <summary>
@@ -337,11 +348,16 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 return;
             }
 
-            TThis funcWithoutStates = Zero();
+            var funcWithoutStates = Builder.Zero();
             funcWithoutStates.AddStates(newStateId - 1);
-            funcWithoutStates.Start = funcWithoutStates.States[oldToNewStateIdMapping[this.Start.Index]];
+            funcWithoutStates.StartStateIndex = oldToNewStateIdMapping[this.Start.Index];
+
+            // TODO
+            /*
             funcWithoutStates.LogValueOverride = this.LogValueOverride;
             funcWithoutStates.PruneTransitionsWithLogWeightLessThan = this.PruneTransitionsWithLogWeightLessThan;
+            */
+
             for (int i = 0; i < this.States.Count; ++i)
             {
                 if (oldToNewStateIdMapping[i] == -1)
@@ -350,21 +366,19 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 }
 
                 State oldState = this.States[i];
-                State newState = funcWithoutStates.States[oldToNewStateIdMapping[i]];
+                var newState = funcWithoutStates[oldToNewStateIdMapping[i]];
                 newState.SetEndWeight(oldState.EndWeight);
-                for (int transitionIndex = 0; transitionIndex < oldState.TransitionCount; ++transitionIndex)
+                foreach (var transition in oldState.Transitions)
                 {
-                    Transition transition = oldState.GetTransition(transitionIndex);
-                    int newDestStateId = oldToNewStateIdMapping[transition.DestinationStateIndex];
+                    var newDestStateId = oldToNewStateIdMapping[transition.DestinationStateIndex];
                     if (newDestStateId != -1)
                     {
-                        State newDestState = funcWithoutStates.States[newDestStateId];
-                        newState.AddTransition(transition.ElementDistribution, transition.Weight, newDestState, transition.Group);
+                        newState.AddTransition(transition.ElementDistribution, transition.Weight, newDestStateId, transition.Group);
                     }
                 }
             }
 
-            this.SwapWith(funcWithoutStates);
+            this.SwapWith(funcWithoutStates.GetAutomaton());
         }
 
         /// <summary>
@@ -376,6 +390,9 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
         /// <param name="logWeightThreshold">The smallest log weight that a transition can have and not be removed.</param>
         public void RemoveTransitionsWithSmallWeights(double logWeightThreshold)
         {
+            // TODO
+
+            /*
             foreach (var state in this.States)
             {
                 for (int i = state.TransitionCount-1; i >=0; i--)
@@ -387,6 +404,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 }
             }
             RemoveOrphanStates();
+            */
         }
         
         /// <summary>
@@ -436,9 +454,8 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             stateLabels.Add(currentState.Index, true);
 
             bool isGeneralizedTree = true;
-            for (int i = 0; i < currentState.TransitionCount; ++i)
+            foreach (var transition in currentState.Transitions)
             {
-                Transition transition = currentState.GetTransition(i);
 
                 // Self-loops are allowed
                 if (transition.DestinationStateIndex != currentState.Index)
@@ -457,15 +474,19 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
         /// </summary>
         private void MergeParallelTransitions()
         {
+            return;
+            // TODO
+            /*
             for (int stateIndex = 0; stateIndex < this.States.Count; ++stateIndex)
             {
-                State state = this.States[stateIndex];
-                for (int transitionIndex1 = 0; transitionIndex1 < state.TransitionCount; ++transitionIndex1)
+                var state = this.States[stateIndex];
+                var transitions = state.Transitions;
+                for (int transitionIndex1 = 0; transitionIndex1 < transitions.Count; ++transitionIndex1)
                 {
-                    Transition transition1 = state.GetTransition(transitionIndex1);
-                    for (int transitionIndex2 = transitionIndex1 + 1; transitionIndex2 < state.TransitionCount; ++transitionIndex2)
+                    Transition transition1 = transitions[transitionIndex1];
+                    for (int transitionIndex2 = transitionIndex1 + 1; transitionIndex2 < transitions.Count; ++transitionIndex2)
                     {
-                        Transition transition2 = state.GetTransition(transitionIndex2);
+                        Transition transition2 = transitions[transitionIndex2];
                         if (transition1.DestinationStateIndex == transition2.DestinationStateIndex && transition1.Group == transition2.Group)
                         {
                             bool removeTransition2 = false;
@@ -502,6 +523,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                     }
                 }
             }
+            */
         }
 
         /// <summary>
@@ -512,52 +534,47 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
         /// <returns>The copied part of the automaton.</returns>
         private TThis CopyNonSimplifiable(ArrayDictionary<bool> stateLabels)
         {
-            TThis result = Zero();
-            if (!stateLabels[this.Start.Index])
+            var result = Builder.Zero();
+            if (stateLabels[this.Start.Index])
             {
-                var copiedStateCache = new ArrayDictionary<State>();
-                result.Start = result.DoCopyNonSimplifiable(this.Start, stateLabels, true, copiedStateCache);
+                return result.GetAutomaton();
             }
 
-            return result;
-        }
+            var copiedStateCache = new ArrayDictionary<int>();
+            result.StartStateIndex = DoCopyNonSimplifiable(this.Start, true);
 
-        /// <summary>
-        /// Recursively creates a copy of the non-simplifiable part of the automaton
-        /// (states labeled with <see langword="false"/> by <see cref="LabelStatesForSimplification"/>).
-        /// </summary>
-        /// <param name="stateToCopy">The currently traversed state that needs to be copied.</param>
-        /// <param name="stateLabels">The state labels obtained from <see cref="LabelStatesForSimplification"/>.</param>
-        /// <param name="lookAtLabels">Whether or not labels should be ignored because one of the ancestors was labeled with <see langword="false"/>.</param>
-        /// <param name="copiedStateCache">Cache of the state copies to avoid creating redundant states when traversing diamond-like structures.</param>
-        /// <returns>The copied part of the automaton.</returns>
-        private State DoCopyNonSimplifiable(
-            State stateToCopy, ArrayDictionary<bool> stateLabels, bool lookAtLabels, ArrayDictionary<State> copiedStateCache)
-        {
-            Debug.Assert(!lookAtLabels || !stateLabels[stateToCopy.Index], "States that are not supposed to be copied should not be visited.");
+            return result.GetAutomaton();
 
-            State copiedState;
-            if (copiedStateCache.TryGetValue(stateToCopy.Index, out copiedState))
+            // Recursively creates a copy of the non-simplifiable part of the automaton
+            int DoCopyNonSimplifiable(State stateToCopy, bool lookAtLabels)
             {
-                return copiedState;
-            }
+                Debug.Assert(!lookAtLabels || !stateLabels[stateToCopy.Index], "States that are not supposed to be copied should not be visited.");
 
-            copiedState = this.AddState();
-            copiedState.SetEndWeight(stateToCopy.EndWeight);
-            copiedStateCache.Add(stateToCopy.Index, copiedState);
-
-            for (int i = 0; i < stateToCopy.TransitionCount; ++i)
-            {
-                Transition transitionToCopy = stateToCopy.GetTransition(i);
-                State destStateToCopy = stateToCopy.Owner.States[transitionToCopy.DestinationStateIndex];
-                if (!lookAtLabels || !stateLabels[destStateToCopy.Index])
+                if (copiedStateCache.TryGetValue(stateToCopy.Index, out var copiedStateIndex))
                 {
-                    State copiedDestState = this.DoCopyNonSimplifiable(destStateToCopy, stateLabels, false, copiedStateCache);
-                    copiedState.AddTransition(transitionToCopy.ElementDistribution, transitionToCopy.Weight, copiedDestState, transitionToCopy.Group);
+                    return copiedStateIndex;
                 }
-            }
 
-            return copiedState;
+                var copiedState = result.AddState();
+                copiedState.SetEndWeight(stateToCopy.EndWeight);
+                copiedStateCache.Add(stateToCopy.Index, copiedState.Index);
+
+                foreach (var transitionToCopy in stateToCopy.Transitions)
+                {
+                    State destStateToCopy = stateToCopy.Owner.States[transitionToCopy.DestinationStateIndex];
+                    if (!lookAtLabels || !stateLabels[destStateToCopy.Index])
+                    {
+                        int copiedDestStateIndex = DoCopyNonSimplifiable(destStateToCopy, false);
+                        copiedState.AddTransition(
+                            transitionToCopy.ElementDistribution,
+                            transitionToCopy.Weight,
+                            copiedDestStateIndex,
+                            transitionToCopy.Group);
+                    }
+                }
+
+                return copiedState.Index;
+            }
         }
 
         /// <summary>
@@ -646,14 +663,17 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 currentWeight = stateAndWeight.Weight;
 
                 // Find a non-epsilon self-loop if there is one
-                var selfLoopIndex = -1;
-                for (var i = 0; i < state.TransitionCount; ++i)
+                Transition? selfLoop = null;
+                foreach (var transition in state.Transitions)
                 {
-                    var transition = state.GetTransition(i);
-                    if (transition.DestinationStateIndex != state.Index) continue;
-                    if (selfLoopIndex == -1)
+                    if (transition.DestinationStateIndex != state.Index)
                     {
-                        selfLoopIndex = i;
+                        continue;
+                    }
+
+                    if (selfLoop == null)
+                    {
+                        selfLoop = transition;
                     }
                     else
                     {
@@ -662,11 +682,10 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 }
 
                 // Push the found self-loop to the end of the current sequence
-                if (selfLoopIndex != -1)
+                if (selfLoop != null)
                 {
-                    var transition = state.GetTransition(selfLoopIndex);
                     currentSequenceElements.Add(new Simplification.GeneralizedElement(
-                        transition.ElementDistribution, transition.Group, transition.Weight));
+                        selfLoop.Value.ElementDistribution, selfLoop.Value.Group, selfLoop.Value.Weight));
                     stack.Push(new ElementItem(null));
                 }
 
@@ -674,15 +693,13 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 if (state.CanEnd && stateLabels[state.Index])
                 {
                     var sequence = new Simplification.GeneralizedSequence(currentSequenceElements);
-                        // TODO: use immutable data structure instead of copying sequences
+                    // TODO: use immutable data structure instead of copying sequences
                     weightedSequences.Add(new Simplification.WeightedSequence(sequence, Weight.Product(currentWeight, state.EndWeight)));
                 }
 
                 // Traverse the outgoing transitions
-                for (var i = 0; i < state.TransitionCount; ++i)
+                foreach (var transition in state.Transitions)
                 {
-                    var transition = state.GetTransition(i);
-
                     // Skip self-loops & disallowed states
                     if (transition.DestinationStateIndex == state.Index ||
                         !stateLabels[transition.DestinationStateIndex])
@@ -723,6 +740,8 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
         /// </remarks>
         private void AddGeneralizedSequence(int firstAllowedStateIndex, Simplification.GeneralizedSequence sequence, Weight weight)
         {
+            // TODO
+            /*
             // First, try to add at start state
             bool isFreshStartState = this.IsCanonicZero();
             if (this.DoAddGeneralizedSequence(this.Start, isFreshStartState, false, firstAllowedStateIndex, 0, sequence, weight))
@@ -740,6 +759,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             // This should always work
             bool success = this.DoAddGeneralizedSequence(otherBranch, true, false, firstAllowedStateIndex, 0, sequence, weight);
             Debug.Assert(success, "This call must always succeed.");
+            */
         }
 
         /// <summary>
@@ -769,6 +789,9 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             Simplification.GeneralizedSequence sequence,
             Weight weight)
         {
+            return false;
+
+            /*
             bool success;
 
             if (currentSequencePos == sequence.Count)
@@ -776,9 +799,8 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 if (!selfLoopAlreadyMatched)
                 {
                     // We can't finish in a state with a self-loop
-                    for (int i = 0; i < state.TransitionCount; ++i)
+                    foreach (var transition in state.Transitions)
                     {
-                        Transition transition = state.GetTransition(i);
                         if (transition.DestinationStateIndex == state.Index)
                         {
                             return false;
@@ -927,6 +949,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             success = this.DoAddGeneralizedSequence(newChild, true, false, firstAllowedStateIndex, currentSequencePos + 1, sequence, weight);
             Debug.Assert(success, "This call must always succeed.");
             return true;
+            */
         }
 
         /// <summary>
