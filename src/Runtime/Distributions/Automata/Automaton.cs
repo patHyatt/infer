@@ -2358,6 +2358,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
 
             // Swap contents
             Util.Swap(ref this.stateCollection.states, ref automaton.stateCollection.states);
+            Util.Swap(ref this.stateCollection.transitions, ref automaton.stateCollection.transitions);
             Util.Swap(ref this.startStateIndex, ref automaton.startStateIndex);
             Util.Swap(ref this.isEpsilonFree, ref automaton.isEpsilonFree);
             var dummy = this.LogValueOverride;

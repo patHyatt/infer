@@ -221,7 +221,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                     resultStates[i] = state;
                 }
 
-                return new StateCollection(owner, this.states.ToArray(), resultTransitions);
+                return new StateCollection(owner, resultStates, resultTransitions);
             }
 
             public struct StateBuilder
