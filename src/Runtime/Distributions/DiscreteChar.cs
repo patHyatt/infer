@@ -16,6 +16,9 @@ namespace Microsoft.ML.Probabilistic.Distributions
     using Math;
     using Utilities;
     using Factors.Attributes;
+
+    using Microsoft.ML.Probabilistic.Core.Collections;
+
     using Serialization;
 
     /// <summary>
@@ -145,7 +148,7 @@ namespace Microsoft.ML.Probabilistic.Distributions
         /// The probabilities need to be normalized. The character ranges need to be sorted.
         /// The created objects takes ownership of the character range list.
         /// </remarks>
-        private DiscreteChar(double probabilityOutsideRanges, CharRange[] ranges, int rangeCount) =>
+        private DiscreteChar(double probabilityOutsideRanges, ReadOnlyArray<CharRange> ranges, int rangeCount) =>
             this.data_ = Storage.Create(ranges, probabilityOutsideRanges);
 
         private DiscreteChar(Storage storage) => this.data_ = storage;
@@ -191,7 +194,7 @@ namespace Microsoft.ML.Probabilistic.Distributions
         #region Distribution properties
 
         /// <summary>
-        /// Gets the probability assigned to characters outside ranges returned by <see cref="GetRanges"/>.
+        /// Gets the probability assigned to characters outside ranges returned by <see cref="Ranges"/>.
         /// </summary>
         public double ProbabilityOutsideRanges => this.Data.ProbabilityOutsideRanges;
 
@@ -912,12 +915,8 @@ namespace Microsoft.ML.Probabilistic.Distributions
         /// <remarks>
         /// See <see cref="ProbabilityOutsideRanges"/> for the probability of characters not covered by the returned ranges.
         /// </remarks>
-        /// <returns>An array of character ranges with associated probabilities.</returns>
-        public CharRange[] GetRanges()
-        {
-            // TODO: use immutable arrays and get rid of clone
-            return (CharRange[])this.Data.Ranges.Clone();
-        }
+        /// <value>An array of character ranges with associated probabilities.</value>
+        public ReadOnlyArray<CharRange> Ranges => this.Data.Ranges;
 
         /// <summary>
         /// Creates a distribution which is uniform over all characters
@@ -1282,7 +1281,7 @@ namespace Microsoft.ML.Probabilistic.Distributions
             {
                 if (excludeZeroProb && state1.ProbabilityOutsideRanges == 0.0 && state2.ProbabilityOutsideRanges == 0.0)
                 {
-                    if (state1.Ranges.Length == 0 || state2.Ranges.Length == 0)
+                    if (state1.Ranges.Count == 0 || state2.Ranges.Count == 0)
                     {
                         yield break;
                     }
@@ -1290,7 +1289,7 @@ namespace Microsoft.ML.Probabilistic.Distributions
                     int rangeIndex1 = 0;
                     int rangeIndex2 = 0;
 
-                    while (rangeIndex1 < state1.Ranges.Length && rangeIndex2 < state2.Ranges.Length)
+                    while (rangeIndex1 < state1.Ranges.Count && rangeIndex2 < state2.Ranges.Count)
                     {
                         var range1 = state1.Ranges[rangeIndex1];
                         var range2 = state2.Ranges[rangeIndex2];
@@ -1374,19 +1373,19 @@ namespace Microsoft.ML.Probabilistic.Distributions
                             yield break;
                         }
 
-                        if (rangeIndex1 < state1.Ranges.Length &&
+                        if (rangeIndex1 < state1.Ranges.Count &&
                             state1.Ranges[rangeIndex1].EndExclusive == currentStartInclusive)
                         {
                             ++rangeIndex1;
                         }
 
-                        if (rangeIndex2 < state2.Ranges.Length &&
+                        if (rangeIndex2 < state2.Ranges.Count &&
                             state2.Ranges[rangeIndex2].EndExclusive == currentStartInclusive)
                         {
                             ++rangeIndex2;
                         }
 
-                        if (rangeIndex1 < state1.Ranges.Length)
+                        if (rangeIndex1 < state1.Ranges.Count)
                         {
                             if (state1.Ranges[rangeIndex1].StartInclusive > currentStartInclusive)
                             {
@@ -1405,7 +1404,7 @@ namespace Microsoft.ML.Probabilistic.Distributions
                             currentEndExclusive = CharRangeEndExclusive;
                         }
 
-                        if (rangeIndex2 < state2.Ranges.Length)
+                        if (rangeIndex2 < state2.Ranges.Count)
                         {
                             if (state2.Ranges[rangeIndex2].StartInclusive > currentStartInclusive)
                             {
@@ -1485,7 +1484,7 @@ namespace Microsoft.ML.Probabilistic.Distributions
             /// The character probabilities must be kept normalized by applying <see cref="StorageBuilder.NormalizeProbabilities"/> when necessary.
             /// </remarks>
             [DataMember]
-            public CharRange[] Ranges { get; private set; } // TODO: use immutable array
+            public ReadOnlyArray<CharRange> Ranges { get; private set; } // TODO: use immutable array
 
             /// <summary>
             /// The probability of a character outside character ranges defined by <see cref="Ranges"/>.
@@ -1513,7 +1512,7 @@ namespace Microsoft.ML.Probabilistic.Distributions
             {
             }
 
-            private Storage(CharRange[] ranges, double probabilityOutsideRanges, CharClasses charClaasses, string regexRepresentation)
+            private Storage(ReadOnlyArray<CharRange> ranges, double probabilityOutsideRanges, CharClasses charClaasses, string regexRepresentation)
             {
                 this.Ranges = ranges;
                 this.ProbabilityOutsideRanges = probabilityOutsideRanges;
@@ -1521,11 +1520,11 @@ namespace Microsoft.ML.Probabilistic.Distributions
                 this.regexRepresentation = regexRepresentation;
             }
 
-            public static Storage CreateUncached(CharRange[] ranges, double probabilityOutsideRanges, CharClasses charClaasses = CharClasses.Unknown, string regexRepresentation = null) =>
+            public static Storage CreateUncached(ReadOnlyArray<CharRange> ranges, double probabilityOutsideRanges, CharClasses charClaasses = CharClasses.Unknown, string regexRepresentation = null) =>
                 new Storage(ranges, probabilityOutsideRanges, charClaasses, regexRepresentation);
 
             public static Storage Create(
-                CharRange[] ranges,
+                ReadOnlyArray<CharRange> ranges,
                 double probabilityOutsideRanges,
                 CharClasses charClaasses = CharClasses.Unknown,
                 string regexRepresentation = null)
@@ -1535,8 +1534,11 @@ namespace Microsoft.ML.Probabilistic.Distributions
                     : CreateUncached(ranges, probabilityOutsideRanges, charClaasses, regexRepresentation);
             }
 
-            public static Storage CreatePoint(char point, CharRange[] ranges = null) =>
+            public static Storage CreatePoint(char point, ReadOnlyArray<CharRange> ranges) =>
                 StorageCache.GetPointMass(point, ranges);
+
+            public static Storage CreatePoint(char point) =>
+                StorageCache.GetPointMass(point, new ReadOnlyArray<CharRange>(null));
 
             public static Storage CreateUniformInRanges(IEnumerable<char> startEndPairs, CharClasses charClasses, string regexRepresentation)
             {
@@ -1610,8 +1612,8 @@ namespace Microsoft.ML.Probabilistic.Distributions
             // TODO: also assumes that a point is not represented by zero-probability ranges and a non-zero value outside of ranges
             public bool IsPointMass => IsRangesPointMass(this.Ranges);
 
-            private static bool IsRangesPointMass(CharRange[] ranges) =>
-                ranges.Length > 0 && Math.Abs(ranges[0].Probability - 1) < Eps;
+            private static bool IsRangesPointMass(ReadOnlyArray<CharRange> ranges) =>
+                ranges.Count > 0 && Math.Abs(ranges[0].Probability - 1) < Eps;
 
             public char Point =>
                 IsPointMass
@@ -1653,15 +1655,15 @@ namespace Microsoft.ML.Probabilistic.Distributions
             {
                 var propertyMask = new BitVector32();
                 var idx = 0;
-                propertyMask[1 << idx++] = Ranges != null;
+                propertyMask[1 << idx++] = !Ranges.IsNull;
                 writeInt32(propertyMask.Data);
-                if (Ranges != null)
+                if (!Ranges.IsNull)
                 {
-                    writeInt32(Ranges.Length);
+                    writeInt32(Ranges.Count);
                     Ranges.ForEach(range => range.Write(writeInt32, writeDouble));
                 }
 
-                writeInt32(Ranges.Length); // For compatibility with old readers
+                writeInt32(Ranges.Count); // For compatibility with old readers
                 writeInt32((int)CharClasses);
                 writeDouble(ProbabilityOutsideRanges);
             }
@@ -1846,7 +1848,7 @@ namespace Microsoft.ML.Probabilistic.Distributions
 
             private void AppendRanges(StringBuilder representation, bool escape)
             {
-                if (this.Ranges.Length >= 1)
+                if (this.Ranges.Count >= 1)
                 {
                     representation.Append('[');
                     foreach (var range in this.Ranges)
@@ -1892,11 +1894,15 @@ namespace Microsoft.ML.Probabilistic.Distributions
                 PointMasses = new Storage[CharRangeEndExclusive];
             }
 
-            public static Storage GetPointMass(char point, CharRange[] ranges)
+            public static Storage GetPointMass(char point, ReadOnlyArray<CharRange> ranges)
             {
                 if (PointMasses[point] == null)
                 {
-                    PointMasses[point] = Storage.CreateUncached(ranges ?? new[] { new CharRange(point, point + 1, 1) }, 0);
+                    PointMasses[point] = Storage.CreateUncached(
+                        ranges.IsNull
+                            ? new ReadOnlyArray<CharRange>(new[] { new CharRange(point, point + 1, 1) })
+                            : ranges,
+                        0);
                 }
 
                 return PointMasses[point];

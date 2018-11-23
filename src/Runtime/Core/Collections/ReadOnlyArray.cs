@@ -24,6 +24,8 @@ namespace Microsoft.ML.Probabilistic.Core.Collections
             this.array = array;
         }
 
+        public bool IsNull => this.array == null;
+
         public T this[int index] => this.array[index];
 
         public int Count => this.array.Length;
