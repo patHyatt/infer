@@ -25,6 +25,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
         {
             private readonly List<StateData> states;
             private readonly List<LinkedTransition> transitions;
+            private int numRemovedTransitions = 0;
 
             public Builder()
             {
@@ -74,8 +75,6 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 return new StateBuilder(this, index);
             }
 
-            public StateBuilder GetState(int index) => new StateBuilder(this, index);
-
             public void AddStates(int count)
             {
                 for (var i = 0; i < count; ++i)
@@ -86,13 +85,16 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
 
             public void AddStates(StateCollection states)
             {
+                var oldStateCount = states.Count;
                 foreach (var state in states)
                 {
                     var stateBuilder = this.AddState();
                     stateBuilder.SetEndWeight(state.EndWeight);
                     foreach (var transition in state.Transitions)
                     {
-                        stateBuilder.AddTransition(transition);
+                        var updatedTransition = transition;
+                        updatedTransition.DestinationStateIndex += oldStateCount;
+                        stateBuilder.AddTransition(updatedTransition);
                     }
                 }
             }
@@ -111,25 +113,33 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                     foreach (var transition in state.Transitions)
                     {
                         var updatedTransition = transition;
-                        updatedTransition.Group = group;
                         updatedTransition.DestinationStateIndex += oldStateCount;
+                        if (group != 0)
+                        {
+                            updatedTransition.Group = group;
+                        }
+
                         stateBuilder.AddTransition(updatedTransition);
                     }
                 }
 
-                var secondStartState = oldStateCount + automaton.startStateIndex;
+                var secondStartState = this[oldStateCount + automaton.startStateIndex];
 
-                // TODO: make efficient
-                bool startIncoming = automaton.Start.HasIncomingTransitions;
-                if (!startIncoming || endStates.All(endState => (endState.TransitionCount == 0)))
+                if (avoidEpsilonTransitions &&
+                    (AllEndStatesHaveNoTransitions() || !automaton.Start.HasIncomingTransitions))
                 {
-                    foreach (var endState in endStates)
+                    // Remove start state of appended automaton and copy all its transitions to previous end states
+                    for (var i = 0; i < oldStateCount; ++i)
                     {
-                        for (int transitionIndex = 0;
-                             transitionIndex < secondStartState.TransitionCount;
-                             transitionIndex++)
+                        var endState = this[i];
+                        if (!endState.CanEnd)
                         {
-                            var transition = secondStartState.GetTransition(transitionIndex);
+                            continue;
+                        }
+
+                        for (var iterator = secondStartState.TransitionIterator; iterator.Ok; iterator.Next())
+                        {
+                            var transition = iterator.Value;
 
                             if (group != 0)
                             {
@@ -145,21 +155,85 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                                 transition.Weight = Weight.Product(transition.Weight, endState.EndWeight);
                             }
 
-                            endState.Data.AddTransition(transition);
+                            endState.AddTransition(transition);
                         }
 
                         endState.SetEndWeight(Weight.Product(endState.EndWeight, secondStartState.EndWeight));
                     }
 
-                    this.States.Remove(secondStartState.Index);
-                    return;
+                    this.RemoveState(secondStartState.Index);
+                }
+                else
+                {
+                    // Just connect all end states with start state of appended automaton
+                    for (var i = 0; i < this.states.Count; i++)
+                    {
+                        var state = this[i];
+                        state.AddEpsilonTransition(state.EndWeight, secondStartState.Index, group);
+                        state.SetEndWeight(Weight.Zero);
+                    }
                 }
 
-                for (int i = 0; i < endStates.Count; i++)
+                bool AllEndStatesHaveNoTransitions()
                 {
-                    State state = endStates[i];
-                    state.AddEpsilonTransition(state.EndWeight, secondStartState, group);
-                    state.SetEndWeight(Weight.Zero);
+                    for (var i = 0; i < oldStateCount; ++i)
+                    {
+                        var state = this.states[i];
+                        if (state.CanEnd && state.FirstTransition != -1)
+                        {
+                            return false;
+                        }
+                    }
+
+                    return true;
+                }
+            }
+
+            public void RemoveState(int stateIndex)
+            {
+                // After state is removed, all its transitions will be dead, count them
+                var transitionIndex = this.states[stateIndex].FirstTransition;
+                while (transitionIndex != -1)
+                {
+                    ++this.numRemovedTransitions;
+                    transitionIndex = this.transitions[transitionIndex].next;
+                }
+
+                this.states.RemoveAt(stateIndex);
+
+                for (var i = 0; i < this.states.Count; ++i)
+                {
+                    var state = this.states[i];
+                    var prevIndex = -1;
+                    var curIndex = state.FirstTransition;
+                    while (curIndex != -1)
+                    {
+                        var curLinkedTransition = this.transitions[curIndex];
+                        if (curLinkedTransition.transition.DestinationStateIndex == stateIndex)
+                        {
+                            // unlink transition from linked list, but keep it an array
+                            ++this.numRemovedTransitions;
+                            if (prevIndex == -1)
+                            {
+                                state.FirstTransition = curLinkedTransition.next;
+                                this.states[i] = state;
+                            }
+                            else
+                            {
+                                var prevLinkedTransition = this.transitions[prevIndex];
+                                prevLinkedTransition.next = curLinkedTransition.next;
+                                this.transitions[prevIndex] = prevLinkedTransition;
+                            }
+                        }
+                        else if (curLinkedTransition.transition.DestinationStateIndex > stateIndex)
+                        {
+                            curLinkedTransition.transition.DestinationStateIndex -= 1;
+                            this.transitions[curIndex] = curLinkedTransition;
+                        }
+
+                        prevIndex = curIndex;
+                        curIndex = curLinkedTransition.next;
+                    }
                 }
             }
 
@@ -190,7 +264,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 }
 
                 var resultStates = new StateData[this.states.Count];
-                var resultTransitions = new Transition[this.transitions.Count];
+                var resultTransitions = new Transition[this.transitions.Count - this.numRemovedTransitions];
                 var nextResultTransitionIndex = 0;
 
                 for (var i = 0; i < resultStates.Length; ++i)

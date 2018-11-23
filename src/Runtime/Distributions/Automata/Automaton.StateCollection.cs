@@ -108,7 +108,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             /// </summary>
             public IEnumerator<State> GetEnumerator()
             {
-                // TODO: optimize?
+                // TODO: optimize! (introduce ValueType enumerator)
                 var owner = this.owner;
                 var states = this.states;
                 var transitions = this.transitions;

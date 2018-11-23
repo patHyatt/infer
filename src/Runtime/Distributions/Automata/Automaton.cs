@@ -673,7 +673,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 if (i != maxTimes)
                 {
                     prevStateCount = result.StatesCount;
-                    result.Append(automaton, false);
+                    result.Append(automaton, avoidEpsilonTransitions: false);
                 }
             }
 
