@@ -237,7 +237,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 /// If the value of this parameter is <see langword="null"/>, an epsilon transition will be created.
                 /// </param>
                 /// <param name="weight">The transition weight.</param>
-                /// <param name="destinationState">
+                /// <param name="destinationStateIndex">
                 /// The destination state of the added transition.
                 /// If the value of this parameter is <see langword="null"/>, a new state will be created.</param>
                 /// <param name="group">The group of the added transition.</param>
@@ -262,7 +262,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 /// </summary>
                 /// <param name="element">The element.</param>
                 /// <param name="weight">The transition weight.</param>
-                /// <param name="destinationState">
+                /// <param name="destinationStateIndex">
                 /// The destination state of the added transition.
                 /// If the value of this parameter is <see langword="null"/>, a new state will be created.</param>
                 /// <param name="group">The group of the added transition.</param>
@@ -281,7 +281,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 /// Adds an epsilon transition to the current state.
                 /// </summary>
                 /// <param name="weight">The transition weight.</param>
-                /// <param name="destinationState">
+                /// <param name="destinationStateIndex">
                 /// The destination state of the added transition.
                 /// If the value of this parameter is <see langword="null"/>, a new state will be created.</param>
                 /// <param name="group">The group of the added transition.</param>
@@ -326,7 +326,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 /// as well as the intermediate states. All the added transitions have unit weight.
                 /// </summary>
                 /// <param name="sequence">The sequence.</param>
-                /// <param name="destinationState">
+                /// <param name="destinationStateIndex">
                 /// The last state in the transition series.
                 /// If the value of this parameter is <see langword="null"/>, a new state will be created.
                 /// </param>
