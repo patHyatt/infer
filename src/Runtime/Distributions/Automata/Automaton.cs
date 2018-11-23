@@ -647,7 +647,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             }
 
             int maxTimes = nonZeroRepetitionWeights[nonZeroRepetitionWeights.Count - 1].Index;
-            var result = Builder.ConstantOn(1.0, SequenceManipulator.ToSequence(new TElement[0]));
+            var result = Builder.ConstantOn(Weight.One, SequenceManipulator.ToSequence(new TElement[0]));
 
             // Build a list of all intermediate end states with their target ending weights while adding repetitions
             var endStatesWithTargetWeights = new List<(int, Weight)>();
@@ -720,7 +720,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
 
             TSequence emptySequence = SequenceManipulator.ToSequence(new TElement[0]);
 
-            var result = Builder.ConstantOn(1.0, emptySequence);
+            var result = Builder.ConstantOn(Weight.One, emptySequence);
             for (int i = 0; i < minTimes; ++i)
             {
                 result.Append(automaton);
@@ -1186,7 +1186,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             }
 
             var builder = Builder.FromAutomaton(this);
-            builder.Append(automaton);
+            builder.Append(automaton, group);
             this.SwapWith(builder.GetAutomaton());
         }
 
