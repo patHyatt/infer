@@ -70,6 +70,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                     new StateData
                     {
                         FirstTransition = -1,
+                        TransitionCount = -1,
                         EndWeight = Weight.Zero,
                     });
                 return new StateBuilder(this, index);
@@ -319,11 +320,31 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                         new LinkedTransition
                         {
                             transition = transition,
-                            next = this.builder.states[this.Index].FirstTransition,
+                            next = -1,
                         });
                     var state = this.builder.states[this.Index];
-                    state.FirstTransition = transitionIndex;
-                    this.builder.states[this.Index] = state;
+
+                    if (state.TransitionCount != -1)
+                    {
+                        // update "next" field in old tail
+                        var oldTail = this.builder.transitions[state.TransitionCount];
+                        oldTail.next = transitionIndex;
+                        this.builder.transitions[state.TransitionCount] = oldTail;
+                    }
+                    else
+                    {
+                        state.FirstTransition = transitionIndex;
+                        state.TransitionCount = transitionIndex;
+                        this.builder.states[this.Index] = state;
+                    }
+
+                    state.TransitionCount = transitionIndex;
+                    if (state.FirstTransition == -1)
+                    {
+                        state.FirstTransition = transitionIndex;
+                    }
+
+                    
                     return new StateBuilder(this.builder, transition.DestinationStateIndex);
                 }
 
