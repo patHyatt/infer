@@ -111,18 +111,12 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
         /// <remarks>See <a href="http://www.cs.nyu.edu/~mohri/pub/hwa.pdf"/> for algorithm details.</remarks>
         public bool TryDeterminize(int maxStatesBeforeStop)
         {
-            return false;
-            /*
             Argument.CheckIfInRange(
                 maxStatesBeforeStop > 0 && maxStatesBeforeStop <= MaxStateCount,
                 "maxStatesBeforeStop",
                 "The maximum number of states must be positive and not greater than the maximum number of states allowed in an automaton.");
 
             this.MakeEpsilonFree(); // Deterministic automata cannot have epsilon-transitions
-            ////using (var writer = new System.IO.StreamWriter(@"\GraphViz\graphviz-2.38\release\bin\epsfree.txt"))
-            ////{
-            ////    writer.WriteLine(this.ToString(AutomatonFormats.GraphViz));
-            ////}
 
             if (this.UsesGroups())
             {
@@ -134,19 +128,19 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             // Such pairs correspond to states of the resulting automaton.
             var weightedStateSetQueue = new Queue<Determinization.WeightedStateSet>();
             var weightedStateSetToNewState = new Dictionary<Determinization.WeightedStateSet, int>();
-            var result = Builder.Zero();
+            var builder = Builder.Zero();
 
             var startWeightedStateSet = new Determinization.WeightedStateSet { { this.Start.Index, Weight.One } };
             weightedStateSetQueue.Enqueue(startWeightedStateSet);
-            weightedStateSetToNewState.Add(startWeightedStateSet, result.StartStateIndex);
-            result.Start.SetEndWeight(this.Start.EndWeight);
+            weightedStateSetToNewState.Add(startWeightedStateSet, builder.StartStateIndex);
+            builder.Start.SetEndWeight(this.Start.EndWeight);
 
             while (weightedStateSetQueue.Count > 0)
             {
                 // Take one unprocessed state of the resulting automaton
                 Determinization.WeightedStateSet currentWeightedStateSet = weightedStateSetQueue.Dequeue();
                 var currentStateIndex = weightedStateSetToNewState[currentWeightedStateSet];
-                var currentState = result.GetState(currentStateIndex);
+                var currentState = builder[currentStateIndex];
 
                 // Find out what transitions we should add for this state
                 IEnumerable<Tuple<TElementDistribution, Weight, Determinization.WeightedStateSet>> outgoingTransitionInfos =
@@ -162,14 +156,14 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                     int destinationStateIndex;
                     if (!weightedStateSetToNewState.TryGetValue(destWeightedStateSet, out destinationStateIndex))
                     {
-                        if (result.StatesCount == maxStatesBeforeStop)
+                        if (builder.StatesCount == maxStatesBeforeStop)
                         {
                             // Too many states, determinization attempt failed
                             return false;
                         }
 
                         // Add new state to the result
-                        var destinationState = result.AddState();
+                        var destinationState = builder.AddState();
                         weightedStateSetToNewState.Add(destWeightedStateSet, destinationState.Index);
                         weightedStateSetQueue.Enqueue(destWeightedStateSet);
 
@@ -190,23 +184,15 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 }
             }
 
-            ////using (var writer = new System.IO.StreamWriter(@"\GraphViz\graphviz-2.38\release\bin\detpremerge.txt"))
-            ////{
-            ////    writer.WriteLine(result.ToString(AutomatonFormats.GraphViz));
-            ////}
-
-            */
-
+            var result = builder.GetAutomaton();
             // TODO
-            /*
-            result.MergeParallelTransitions(); // Determinization produces a separate transition for each segment
-            result.PruneTransitionsWithLogWeightLessThan = this.PruneTransitionsWithLogWeightLessThan;
+            //result.MergeParallelTransitions(); // Determinization produces a separate transition for each segment
+            //result.PruneTransitionsWithLogWeightLessThan = this.PruneTransitionsWithLogWeightLessThan;
             result.LogValueOverride = this.LogValueOverride;
             // Determinization was successful, we can replace the current automaton with its deterministic version
             this.SwapWith(result);
-            */
 
-            //return true;
+            return true;
         }
 
         /// <summary>
