@@ -35,7 +35,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             /// The number of outgoing transitions from the state.
             /// </summary>
             [DataMember]
-            internal int TransitionCount;
+            internal int LastTransition;
 
             [DataMember]
             internal Weight EndWeight;
@@ -43,10 +43,10 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             /// <summary>
             /// Initializes a new instance of the <see cref="StateData"/> struct.
             /// </summary>
-            public StateData(int firstTransition, int transitionCount, Weight endWeight)
+            public StateData(int firstTransition, int lastTransition, Weight endWeight)
             {
                 this.FirstTransition = firstTransition;
-                this.TransitionCount = transitionCount;
+                this.LastTransition = lastTransition;
                 this.EndWeight = endWeight;
             }
 

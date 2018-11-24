@@ -98,7 +98,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 new ReadOnlyArrayView<Transition>(
                     this.transitions,
                     this.Data.FirstTransition,
-                    this.Data.TransitionCount);
+                    this.Data.LastTransition);
 
             internal StateData Data => this.states[this.Index];
 

@@ -70,7 +70,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                     new StateData
                     {
                         FirstTransition = -1,
-                        TransitionCount = -1,
+                        LastTransition = -1,
                         EndWeight = Weight.Zero,
                     });
                 return new StateBuilder(this, index);
@@ -86,7 +86,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
 
             public void AddStates(StateCollection states)
             {
-                var oldStateCount = states.Count;
+                var oldStateCount = this.states.Count;
                 foreach (var state in states)
                 {
                     var stateBuilder = this.AddState();
@@ -271,17 +271,15 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 for (var i = 0; i < resultStates.Length; ++i)
                 {
                     var state = this.states[i];
-                    var transitionCount = 0;
                     var transitionIndex = state.FirstTransition;
                     state.FirstTransition = nextResultTransitionIndex;
                     while (transitionIndex != -1)
                     {
                         resultTransitions[nextResultTransitionIndex] = this.transitions[transitionIndex].transition;
                         ++nextResultTransitionIndex;
-                        ++transitionCount;
                         transitionIndex = this.transitions[transitionIndex].next;
                     }
-                    state.TransitionCount = transitionCount;
+                    state.LastTransition = nextResultTransitionIndex;
                     resultStates[i] = state;
                 }
 
@@ -324,26 +322,26 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                         });
                     var state = this.builder.states[this.Index];
 
-                    if (state.TransitionCount != -1)
+                    if (state.LastTransition != -1)
                     {
                         // update "next" field in old tail
-                        var oldTail = this.builder.transitions[state.TransitionCount];
+                        var oldTail = this.builder.transitions[state.LastTransition];
                         oldTail.next = transitionIndex;
-                        this.builder.transitions[state.TransitionCount] = oldTail;
+                        this.builder.transitions[state.LastTransition] = oldTail;
                     }
                     else
                     {
                         state.FirstTransition = transitionIndex;
-                        state.TransitionCount = transitionIndex;
-                        this.builder.states[this.Index] = state;
                     }
 
-                    state.TransitionCount = transitionIndex;
+                    state.LastTransition = transitionIndex;
+                    this.builder.states[this.Index] = state;
+
+                    state.LastTransition = transitionIndex;
                     if (state.FirstTransition == -1)
                     {
                         state.FirstTransition = transitionIndex;
                     }
-
                     
                     return new StateBuilder(this.builder, transition.DestinationStateIndex);
                 }
