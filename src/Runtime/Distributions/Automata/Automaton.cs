@@ -1232,7 +1232,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 return;
             }
 
-            var result = Builder.Zero();
+            var builder = Builder.Zero();
             if (automaton1.UsesGroups())
             {
                 // We cannot swap automaton 1 and automaton 2 as groups from first are used.
@@ -1255,7 +1255,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             }
 
             var productStateCache = new Dictionary<(int, int), int>(automaton1.States.Count + automaton2.States.Count);
-            result.StartStateIndex = BuildProduct(automaton1.Start, automaton2.Start);
+            builder.StartStateIndex = BuildProduct(automaton1.Start, automaton2.Start);
 
             // TODO
             /*
@@ -1263,19 +1263,15 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             result.PruneTransitionsWithLogWeightLessThan = this.MergePruningWeights(automaton1, automaton2);
             result.SimplifyIfNeeded();
             result.LogValueOverride = this.MergeLogValueOverrides(automaton1, automaton2);
+            */
 
+            var result = builder.GetAutomaton();
             if (this is StringAutomaton && tryDeterminize)
             {
-                // TODO
                 result.TryDeterminize();
             }
-            */
-            if (productStateCache.Count > 0)
-            {
-                throw new NotImplementedException();
-            }
 
-            this.SwapWith(result.GetAutomaton());
+            this.SwapWith(builder.GetAutomaton());
 
             // Recursively builds an automaton representing the product of two given automata.
             // Returns start state of product automaton.
@@ -1297,7 +1293,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 }
 
                 // Create a new state
-                var productState = result.AddState();
+                var productState = builder.AddState();
                 productStateCache.Add(statePair, productState.Index);
 
                 // Iterate over transitions in state1
