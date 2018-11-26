@@ -256,7 +256,8 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                     }
                 }
 
-                if (oldToNewStateIdMapping[this.StartStateIndex] == -1)
+                this.StartStateIndex = oldToNewStateIdMapping[this.StartStateIndex];
+                if (this.StartStateIndex == -1)
                 {
                     // Cannot reach any end state from the start state => the automaton is zero everywhere
                     this.SetToZero();

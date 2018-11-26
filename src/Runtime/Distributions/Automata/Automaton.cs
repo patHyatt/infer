@@ -1224,7 +1224,6 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 return;
             }
 
-            var builder = Builder.Zero();
             if (automaton1.UsesGroups())
             {
                 // We cannot swap automaton 1 and automaton 2 as groups from first are used.
@@ -1246,6 +1245,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 }
             }
 
+            var builder = new Builder();
             var productStateCache = new Dictionary<(int, int), int>(automaton1.States.Count + automaton2.States.Count);
             builder.StartStateIndex = BuildProduct(automaton1.Start, automaton2.Start);
 
