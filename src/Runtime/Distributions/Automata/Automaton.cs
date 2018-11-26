@@ -94,11 +94,11 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
         /// Whether the automaton is free of epsilon transition.
         /// If the value of this field is null, it means that the presence of epsilon transitions is unknown.
         /// </summary>
-        private bool? isEpsilonFree; // TODO: Isn't it always known?
+        private bool isEpsilonFree;
 
-        private static ReadOnlyArray<StateData> zeroStates = new[] { new StateData(0, 0, Weight.Zero) };
+        private static readonly ReadOnlyArray<StateData> ZeroStates = new[] { new StateData(0, 0, Weight.Zero) };
 
-        private static ReadOnlyArray<Transition> zeroTransitions = new Transition[] { };
+        private static readonly ReadOnlyArray<Transition> ZeroTransitions = new Transition[] { };
 
         #endregion
 
@@ -1526,7 +1526,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
         /// </summary>
         public void SetToZero()
         {
-            this.stateCollection = new StateCollection(this, zeroStates, zeroTransitions);
+            this.stateCollection = new StateCollection(this, ZeroStates, ZeroTransitions);
         }
 
         /// <summary>
@@ -1819,34 +1819,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
         /// <summary>
         /// Gets a value indicating whether this automaton is epsilon-free.
         /// </summary>
-        public bool IsEpsilonFree
-        {
-            get
-            {
-                if (this.isEpsilonFree == null)
-                {
-                    this.isEpsilonFree = true;
-                    foreach (var state in this.States)
-                    {
-                        foreach (var transition in state.Transitions)
-                        {
-                            if (transition.IsEpsilon)
-                            {
-                                this.isEpsilonFree = false;
-                                break;
-                            }
-                        }
-
-                        if (this.isEpsilonFree == false)
-                        {
-                            break;
-                        }
-                    }
-                }
-
-                return this.isEpsilonFree.Value;
-            }
-        }
+        public bool IsEpsilonFree => this.isEpsilonFree;
 
         /// <summary>
         /// Replaces the current automaton with an equal automaton that has no epsilon transitions.
@@ -2652,8 +2625,8 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
         {
             var propertyMask = new BitVector32();
             var idx = 0;
-            propertyMask[1 << idx++] = this.isEpsilonFree.HasValue;
-            propertyMask[1 << idx++] = this.isEpsilonFree.HasValue && this.isEpsilonFree.Value;
+            propertyMask[1 << idx++] = true; // isEpsilonFree is alway known
+            propertyMask[1 << idx++] = this.isEpsilonFree;
             propertyMask[1 << idx++] = this.LogValueOverride.HasValue;
             propertyMask[1 << idx++] = this.PruneTransitionsWithLogWeightLessThan.HasValue;
             propertyMask[1 << idx++] = true; // start state is alway serialized
@@ -2692,13 +2665,12 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             var propertyMask = new BitVector32(readInt32());
             var res = new TThis();
             var idx = 0;
-            var hasEpsilonFree = propertyMask[1 << idx++];
-            var isEpsilonFree = propertyMask[1 << idx++];
+            // we do not trust serialized "isEpsilonFree". Will take it from builder anyway
+            var hasEpsilonFreeIgnored = propertyMask[1 << idx++];
+            var isEpsilonFreeIgnored = propertyMask[1 << idx++];
             var hasLogValueOverride = propertyMask[1 << idx++];
             var hasPruneTransitions = propertyMask[1 << idx++];
             var hasStartState = propertyMask[1 << idx++];
-
-            res.isEpsilonFree = hasEpsilonFree ? (bool?)isEpsilonFree : null;
 
             if (hasLogValueOverride)
             {
@@ -2728,9 +2700,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 State.ReadTo(ref builder, readInt32, readDouble, readElementDistribution);
             }
 
-            res.stateCollection = builder.GetStateCollection(res);
-
-            return res;
+            return builder.GetAutomaton();
         }
         #endregion
     }

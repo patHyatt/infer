@@ -6,12 +6,10 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
 {
     using System;
     using System.Collections.Generic;
-    using System.Linq;
 
     using Microsoft.ML.Probabilistic.Core.Collections;
     using Microsoft.ML.Probabilistic.Distributions;
     using Microsoft.ML.Probabilistic.Math;
-    using Microsoft.ML.Probabilistic.Utilities;
 
     public abstract partial class Automaton<TSequence, TElement, TElementDistribution, TSequenceManipulator, TThis>
         where TSequence : class, IEnumerable<TElement>
@@ -243,6 +241,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
 
             public void SimplifyIfNeeded()
             {
+                // TODO
                 throw new NotImplementedException();
             }
 
@@ -253,20 +252,13 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
 
             public TThis GetAutomaton()
             {
-                var result = new TThis();
-                result.stateCollection = this.GetStateCollection(result);
-                result.startStateIndex = this.StartStateIndex;
-                return result;
-            }
-
-            internal StateCollection GetStateCollection(TThis owner)
-            {
                 if (this.StartStateIndex < 0 || this.StartStateIndex >= this.states.Count)
                 {
                     throw new InvalidOperationException(
                         $"Build automaton must have a valid start state. StartStateIndex = {this.StartStateIndex}, states.Count = {this.states.Count}");
                 }
 
+                var hasEpsilonTransitions = false;
                 var resultStates = new StateData[this.states.Count];
                 var resultTransitions = new Transition[this.transitions.Count - this.numRemovedTransitions];
                 var nextResultTransitionIndex = 0;
@@ -278,15 +270,21 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                     state.FirstTransition = nextResultTransitionIndex;
                     while (transitionIndex != -1)
                     {
-                        resultTransitions[nextResultTransitionIndex] = this.transitions[transitionIndex].transition;
+                        var transition = this.transitions[transitionIndex].transition;
+                        resultTransitions[nextResultTransitionIndex] = transition;
                         ++nextResultTransitionIndex;
                         transitionIndex = this.transitions[transitionIndex].next;
+                        hasEpsilonTransitions = hasEpsilonTransitions || transition.IsEpsilon;
                     }
                     state.LastTransition = nextResultTransitionIndex;
                     resultStates[i] = state;
                 }
 
-                return new StateCollection(owner, resultStates, resultTransitions);
+                var result = new TThis();
+                result.stateCollection = new StateCollection(result, resultStates, resultTransitions);
+                result.startStateIndex = this.StartStateIndex;
+                result.isEpsilonFree = !hasEpsilonTransitions;
+                return result;
             }
 
             public struct StateBuilder
