@@ -6,11 +6,14 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
 {
     using System;
     using System.Collections.Generic;
+    using System.Diagnostics;
+    using System.Linq;
 
+    using Microsoft.ML.Probabilistic.Collections;
     using Microsoft.ML.Probabilistic.Core.Collections;
     using Microsoft.ML.Probabilistic.Distributions;
     using Microsoft.ML.Probabilistic.Math;
-
+    
     public abstract partial class Automaton<TSequence, TElement, TElementDistribution, TSequenceManipulator, TThis>
         where TSequence : class, IEnumerable<TElement>
         where TElementDistribution : IDistribution<TElement>, SettableToProduct<TElementDistribution>,
@@ -193,61 +196,91 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
 
             public void RemoveState(int stateIndex)
             {
-                // After state is removed, all its transitions will be dead, count them
-                var transitionIndex = this.states[stateIndex].FirstTransition;
-                while (transitionIndex != -1)
+                // After state is removed, all its transitions will be dead
+                for (var iterator = this[stateIndex].TransitionIterator; iterator.Ok; iterator.Next())
                 {
-                    ++this.numRemovedTransitions;
-                    transitionIndex = this.transitions[transitionIndex].next;
+                    iterator.MarkRemoved();
                 }
 
                 this.states.RemoveAt(stateIndex);
 
                 for (var i = 0; i < this.states.Count; ++i)
                 {
-                    var state = this.states[i];
-                    var prevIndex = -1;
-                    var curIndex = state.FirstTransition;
-                    while (curIndex != -1)
+                    for (var iterator = this[i].TransitionIterator; iterator.Ok; iterator.Next())
                     {
-                        var curLinkedTransition = this.transitions[curIndex];
-                        if (curLinkedTransition.transition.DestinationStateIndex == stateIndex)
+                        var transition = iterator.Value;
+                        if (transition.DestinationStateIndex > stateIndex)
                         {
-                            // unlink transition from linked list, but keep it an array
-                            ++this.numRemovedTransitions;
-                            if (prevIndex == -1)
-                            {
-                                state.FirstTransition = curLinkedTransition.next;
-                                this.states[i] = state;
-                            }
-                            else
-                            {
-                                var prevLinkedTransition = this.transitions[prevIndex];
-                                prevLinkedTransition.next = curLinkedTransition.next;
-                                this.transitions[prevIndex] = prevLinkedTransition;
-                            }
+                            transition.DestinationStateIndex -= 1;
+                            iterator.Value = transition;
                         }
-                        else if (curLinkedTransition.transition.DestinationStateIndex > stateIndex)
+                        else if (transition.DestinationStateIndex == stateIndex)
                         {
-                            curLinkedTransition.transition.DestinationStateIndex -= 1;
-                            this.transitions[curIndex] = curLinkedTransition;
+                            iterator.MarkRemoved();
                         }
-
-                        prevIndex = curIndex;
-                        curIndex = curLinkedTransition.next;
                     }
                 }
             }
 
-            public void SimplifyIfNeeded()
+            /// <summary>
+            /// Removes a set of states from the automaton where the set is defined by
+            /// the indices of the false elements in the supplied bool array.
+            /// </summary>
+            /// <param name="statesToRemove">The bool array specifying states to remove</param>
+            ///// <param name="minStatesToActuallyRemove">If the number of stats to remove is less than this value, the removal will not be done.</param>
+            public int RemoveStates(bool[] statesToRemove)
             {
-                // TODO
                 throw new NotImplementedException();
-            }
 
-            public void RemoveDeadStates()
-            {
-                throw new NotImplementedException();
+                /*
+
+                int[] oldToNewStateIdMapping = new int[this.states.Count];
+                int newStateId = 0;
+                int deadStateCount = 0;
+                for (int stateId = 0; stateId < this.states.Count; ++stateId)
+                {
+                    if (statesToKeep[stateId])
+                    {
+                        oldToNewStateIdMapping[stateId] = newStateId++;
+                    }
+                    else
+                    {
+                        oldToNewStateIdMapping[stateId] = -1;
+                        ++deadStateCount;
+                    }
+                }
+
+                if (oldToNewStateIdMapping[this.StartStateIndex] == -1)
+                {
+                    // Cannot reach any end state from the start state => the automaton is zero everywhere
+                    // TODO
+                    // this.SetToZero();
+                    return;
+                }
+                for (int i = 0; i < this.states.Count; ++i)
+                {
+                    if (oldToNewStateIdMapping[i] == -1)
+                    {
+                        continue;
+                    }
+
+                    // TODO
+
+                    State oldState = this.States[i];
+                    var newState = funcWithoutStates[oldToNewStateIdMapping[i]];
+                    newState.SetEndWeight(oldState.EndWeight);
+                    foreach (var transition in oldState.Transitions)
+                    {
+                        var newDestStateId = oldToNewStateIdMapping[transition.DestinationStateIndex];
+                        if (newDestStateId != -1)
+                        {
+                            newState.AddTransition(transition.ElementDistribution, transition.Weight, newDestStateId, transition.Group);
+                        }
+                    }
+                }
+
+                this.SwapWith(funcWithoutStates.GetAutomaton());
+                */
             }
 
             public TThis GetAutomaton()
@@ -255,7 +288,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 if (this.StartStateIndex < 0 || this.StartStateIndex >= this.states.Count)
                 {
                     throw new InvalidOperationException(
-                        $"Build automaton must have a valid start state. StartStateIndex = {this.StartStateIndex}, states.Count = {this.states.Count}");
+                        $"Built automaton must have a valid start state. StartStateIndex = {this.StartStateIndex}, states.Count = {this.states.Count}");
                 }
 
                 var hasEpsilonTransitions = false;
@@ -270,15 +303,28 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                     state.FirstTransition = nextResultTransitionIndex;
                     while (transitionIndex != -1)
                     {
-                        var transition = this.transitions[transitionIndex].transition;
-                        resultTransitions[nextResultTransitionIndex] = transition;
-                        ++nextResultTransitionIndex;
-                        transitionIndex = this.transitions[transitionIndex].next;
-                        hasEpsilonTransitions = hasEpsilonTransitions || transition.IsEpsilon;
+                        var linked = this.transitions[transitionIndex];
+
+                        if (!linked.removed)
+                        {
+                            var transition = linked.transition;
+                            Debug.Assert(
+                                transition.DestinationStateIndex < resultStates.Length,
+                                "Destination indexes must be in valid range");
+                            resultTransitions[nextResultTransitionIndex] = transition;
+                            ++nextResultTransitionIndex;
+                            hasEpsilonTransitions = hasEpsilonTransitions || transition.IsEpsilon;
+                        }
+
+                        transitionIndex = linked.next;
                     }
                     state.LastTransition = nextResultTransitionIndex;
                     resultStates[i] = state;
                 }
+
+                Debug.Assert(
+                    nextResultTransitionIndex == resultTransitions.Length,
+                    "number of copied transitions must match result array size");
 
                 var result = new TThis();
                 result.stateCollection = new StateCollection(result, resultStates, resultTransitions);
@@ -484,6 +530,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 {
                     this.builder = builder;
                     this.index = index;
+                    this.SkipRemoved();
                 }
 
                 public Transition Value
@@ -497,16 +544,37 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                     }
                 }
 
+                public void MarkRemoved()
+                {
+                    var linked = this.builder.transitions[this.index];
+                    Debug.Assert(!linked.removed, "Trying to delete state twice through iterator");
+                    ++this.builder.numRemovedTransitions;
+                    linked.removed = true;
+                    this.builder.transitions[this.index] = linked;
+                }
+
                 public bool Ok => this.index != -1;
 
-                public void Next() =>
+                public void Next()
+                {
                     this.index = this.builder.transitions[this.index].next;
+                    this.SkipRemoved();
+                }
+
+                private void SkipRemoved()
+                {
+                    while (this.index != -1 && this.builder.transitions[this.index].removed)
+                    {
+                        this.index = this.builder.transitions[this.index].next;
+                    }
+                }
             }
 
             private struct LinkedTransition
             {
                 public Transition transition;
                 public int next;
+                public bool removed;
             }
         }
     }

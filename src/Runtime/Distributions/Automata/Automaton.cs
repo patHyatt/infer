@@ -61,6 +61,10 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
     {
         #region Fields & constants
 
+        private static readonly ReadOnlyArray<StateData> ZeroStates = new[] { new StateData(0, 0, Weight.Zero) };
+
+        private static readonly ReadOnlyArray<Transition> ZeroTransitions = new Transition[] { };
+
         /// <summary>
         /// The maximum number of states an automaton can have.
         /// </summary>
@@ -96,10 +100,6 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
         /// </summary>
         private bool isEpsilonFree;
 
-        private static readonly ReadOnlyArray<StateData> ZeroStates = new[] { new StateData(0, 0, Weight.Zero) };
-
-        private static readonly ReadOnlyArray<Transition> ZeroTransitions = new Transition[] { };
-
         #endregion
 
         #region Constructors
@@ -132,11 +132,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
         /// This should only be set non-null if this distribution is improper and there is 
         /// a need to override the actual automaton value. 
         /// </remarks>
-        public double? LogValueOverride
-        {
-            get;
-            set;
-        }
+        public double? LogValueOverride { get; set; }
 
         /// <summary>
         /// Gets or sets a value for truncating small weights.
@@ -146,11 +142,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
         /// <remarks>
         /// TODO: We need to develop more elegant automaton approximation methods, this is a simple placeholder for those.
         /// </remarks>
-        public double? PruneTransitionsWithLogWeightLessThan
-        {
-            get;
-            set;
-        }
+        public double? PruneTransitionsWithLogWeightLessThan { get; set; }
 
         /// <summary>
         /// Gets or sets the maximum number of states an automaton can have.
@@ -1257,19 +1249,18 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             var productStateCache = new Dictionary<(int, int), int>(automaton1.States.Count + automaton2.States.Count);
             builder.StartStateIndex = BuildProduct(automaton1.Start, automaton2.Start);
 
-            // TODO
-            /*
-            result.RemoveDeadStates(); // Product can potentially create dead states
-            result.PruneTransitionsWithLogWeightLessThan = this.MergePruningWeights(automaton1, automaton2);
-            result.SimplifyIfNeeded();
-            result.LogValueOverride = this.MergeLogValueOverrides(automaton1, automaton2);
-            */
+            var simplification = new Simplification(builder, this.PruneTransitionsWithLogWeightLessThan);
+            simplification.RemoveDeadStates(); // Product can potentially create dead states
+            simplification.SimplifyIfNeeded();            
 
             var result = builder.GetAutomaton();
             if (this is StringAutomaton && tryDeterminize)
             {
                 result.TryDeterminize();
             }
+
+            result.PruneTransitionsWithLogWeightLessThan = this.MergePruningWeights(automaton1, automaton2);
+            result.LogValueOverride = this.MergeLogValueOverrides(automaton1, automaton2);
 
             this.SwapWith(builder.GetAutomaton());
 
@@ -1278,9 +1269,6 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             int BuildProduct(State state1, State state2)
             {
                 Debug.Assert(state1 != null && state2 != null, "Valid states must be provided.");
-                Debug.Assert(
-                    !ReferenceEquals(state1.Owner, this) && !ReferenceEquals(state2.Owner, this),
-                    "Cannot build product in place.");
                 Debug.Assert(
                     state2.Owner.IsEpsilonFree,
                     "The second argument of the product operation must be epsilon-free.");
@@ -1464,7 +1452,9 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 }
             }
 
-            result.SimplifyIfNeeded();
+            var simplification = new Simplification(result, this.PruneTransitionsWithLogWeightLessThan);
+            simplification.SimplifyIfNeeded();
+
             this.SwapWith(result.GetAutomaton());
         }
 
@@ -1820,6 +1810,57 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
         /// Gets a value indicating whether this automaton is epsilon-free.
         /// </summary>
         public bool IsEpsilonFree => this.isEpsilonFree;
+
+        /// <summary>
+        /// Tests whether the automaton is deterministic,
+        /// i.e. it's epsilon free and for every state and every element there is at most one transition that allows for that element.
+        /// </summary>
+        /// <returns>
+        /// <see langword="true"/> if the automaton is deterministic,
+        /// <see langword="false"/> otherwise.
+        /// </returns>
+        public bool IsDeterministic()
+        {
+            //// We can't track whether the automaton is deterministic while adding/updating transitions
+            //// because element distributions are not immutable.
+            
+            if (!this.IsEpsilonFree)
+            {
+                return false;
+            }
+            
+            for (int stateId = 0; stateId < this.States.Count; ++stateId)
+            {
+                var state = this.States[stateId];
+
+                // There should be no epsilon transitions
+                foreach (var transition in state.Transitions)
+                {
+                    if (transition.IsEpsilon)
+                    {
+                        return false;
+                    }
+                }
+                
+                // Element distributions should not intersect
+                var transitions = state.Transitions;
+                for (int transitionIndex1 = 0; transitionIndex1 < transitions.Count; ++transitionIndex1)
+                {
+                    var transition1 = transitions[transitionIndex1];
+                    for (int transitionIndex2 = transitionIndex1 + 1; transitionIndex2 < transitions.Count; ++transitionIndex2)
+                    {
+                        var transition2 = transitions[transitionIndex2];
+                        double logProductNormalizer = transition1.ElementDistribution.Value.GetLogAverageOf(transition2.ElementDistribution.Value);
+                        if (!double.IsNegativeInfinity(logProductNormalizer))
+                        {
+                            return false;
+                        }
+                    }
+                }
+            }
+
+            return true;
+        }
 
         /// <summary>
         /// Replaces the current automaton with an equal automaton that has no epsilon transitions.

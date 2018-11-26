@@ -335,8 +335,10 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
 
             var destStateCache = new Dictionary<(int, int), int>();
             result.StartStateIndex = BuildProjectionOfAutomaton(this.sequencePairToWeight.Start, srcAutomaton.Start);
-            result.RemoveDeadStates();
-            result.SimplifyIfNeeded();
+
+            var simplification = new Automaton<TDestSequence, TDestElement, TDestElementDistribution, TDestSequenceManipulator, TDestAutomaton>.Simplification(result, null);
+            simplification.RemoveDeadStates();
+            simplification.SimplifyIfNeeded();
 
             return result.GetAutomaton();
             
@@ -423,8 +425,10 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
 
             var destStateCache = new Dictionary<(int, int), int>();
             result.StartStateIndex = BuildProjectionOfSequence(this.sequencePairToWeight.Start, 0);
-            result.RemoveDeadStates();
-            result.SimplifyIfNeeded();
+
+            var simplification = new Automaton<TDestSequence, TDestElement, TDestElementDistribution, TDestSequenceManipulator, TDestAutomaton>.Simplification(result, null);
+            simplification.RemoveDeadStates();
+            simplification.SimplifyIfNeeded();
 
             return result.GetAutomaton();
 
