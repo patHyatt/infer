@@ -29,16 +29,16 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
         public struct StateCollection : IReadOnlyList<State>
         {
             /// <summary>
-            /// Owner automaton of all states in collection.
-            /// </summary>
-            private readonly Automaton<TSequence, TElement, TElementDistribution, TSequenceManipulator, TThis> owner;
-
-            /// <summary>
             /// TODO
             /// </summary>
             internal ReadOnlyArray<StateData> states;
 
             internal ReadOnlyArray<Transition> transitions;
+
+            /// <summary>
+            /// Owner automaton of all states in collection.
+            /// </summary>
+            private readonly Automaton<TSequence, TElement, TElementDistribution, TSequenceManipulator, TThis> owner;
 
             /// <summary>
             /// Initializes instance of <see cref="StateCollection"/>.

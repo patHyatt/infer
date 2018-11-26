@@ -167,11 +167,14 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 else
                 {
                     // Just connect all end states with start state of appended automaton
-                    for (var i = 0; i < this.states.Count; i++)
+                    for (var i = 0; i < oldStateCount; i++)
                     {
                         var state = this[i];
-                        state.AddEpsilonTransition(state.EndWeight, secondStartState.Index, group);
-                        state.SetEndWeight(Weight.Zero);
+                        if (state.CanEnd)
+                        {
+                            state.AddEpsilonTransition(state.EndWeight, secondStartState.Index, group);
+                            state.SetEndWeight(Weight.Zero);
+                        }
                     }
                 }
 
