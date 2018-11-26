@@ -36,7 +36,9 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
 
             public int StartStateIndex { get; set; }
 
-            public int StatesCount => states.Count;
+            public int StatesCount => this.states.Count;
+
+            public int TransitionsCount => this.transitions.Count - this.numRemovedTransitions;
 
             public StateBuilder this[int index] => new StateBuilder(this, index);
 
@@ -45,7 +47,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             public static Builder Zero()
             {
                 var builder = new Builder();
-                builder.AddState();
+                builder.SetToZero();
                 return builder;
             }
 
@@ -62,6 +64,15 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 var result = Builder.Zero();
                 result.Start.AddTransitionsForSequence(sequence).SetEndWeight(weight);
                 return result;
+            }
+
+            public void SetToZero()
+            {
+                this.states.Clear();
+                this.transitions.Clear();
+                this.numRemovedTransitions = 0;
+                this.StartStateIndex = 0;
+                this.AddState();
             }
 
             public StateBuilder AddState()
@@ -226,18 +237,13 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             /// Removes a set of states from the automaton where the set is defined by
             /// the indices of the false elements in the supplied bool array.
             /// </summary>
-            /// <param name="statesToRemove">The bool array specifying states to remove</param>
-            ///// <param name="minStatesToActuallyRemove">If the number of stats to remove is less than this value, the removal will not be done.</param>
-            public int RemoveStates(bool[] statesToRemove)
+            /// <param name="statesToKeep">The bool array specifying states to keep</param>
+            public int RemoveStates(bool[] statesToKeep)
             {
-                throw new NotImplementedException();
-
-                /*
-
-                int[] oldToNewStateIdMapping = new int[this.states.Count];
-                int newStateId = 0;
-                int deadStateCount = 0;
-                for (int stateId = 0; stateId < this.states.Count; ++stateId)
+                var oldToNewStateIdMapping = new int[this.states.Count];
+                var newStateId = 0;
+                var deadStateCount = 0;
+                for (var stateId = 0; stateId < this.states.Count; ++stateId)
                 {
                     if (statesToKeep[stateId])
                     {
@@ -253,34 +259,47 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 if (oldToNewStateIdMapping[this.StartStateIndex] == -1)
                 {
                     // Cannot reach any end state from the start state => the automaton is zero everywhere
-                    // TODO
-                    // this.SetToZero();
-                    return;
+                    this.SetToZero();
+                    return deadStateCount;
                 }
-                for (int i = 0; i < this.states.Count; ++i)
+
+                for (var i = 0; i < this.states.Count; ++i)
                 {
-                    if (oldToNewStateIdMapping[i] == -1)
+                    var newId = oldToNewStateIdMapping[i];
+                    if (newId == -1)
                     {
+                        // remove all transitions
+                        for (var iterator = this[i].TransitionIterator; iterator.Ok; iterator.Next())
+                        {
+                            iterator.MarkRemoved();
+                        }
+
                         continue;
                     }
 
-                    // TODO
+                    Debug.Assert(newId <= i);
 
-                    State oldState = this.States[i];
-                    var newState = funcWithoutStates[oldToNewStateIdMapping[i]];
-                    newState.SetEndWeight(oldState.EndWeight);
-                    foreach (var transition in oldState.Transitions)
+                    this.states[newId] = this.states[i];
+
+                    // Remap transitions
+                    for (var iterator = this[i].TransitionIterator; iterator.Ok; iterator.Next())
                     {
-                        var newDestStateId = oldToNewStateIdMapping[transition.DestinationStateIndex];
-                        if (newDestStateId != -1)
+                        var transition = iterator.Value;
+                        transition.DestinationStateIndex = oldToNewStateIdMapping[transition.DestinationStateIndex];
+                        if (transition.DestinationStateIndex == -1)
                         {
-                            newState.AddTransition(transition.ElementDistribution, transition.Weight, newDestStateId, transition.Group);
+                            iterator.MarkRemoved();
+                        }
+                        else
+                        {
+                            iterator.Value = transition;
                         }
                     }
                 }
 
-                this.SwapWith(funcWithoutStates.GetAutomaton());
-                */
+                this.states.RemoveRange(newStateId, this.states.Count - newStateId);
+
+                return deadStateCount;
             }
 
             public TThis GetAutomaton()

@@ -2069,29 +2069,6 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
         }
 
         /// <summary>
-        /// Performs depth-first traversal of a given graph.
-        /// </summary>
-        /// <param name="currentVertex">The index of the currently traversed vertex.</param>
-        /// <param name="visitedVertices">An array to keep track of the visited vertices.</param>
-        /// <param name="edgeDestinationIndices">An array containing destination indices of the graph edges.</param>
-        /// <param name="edgeArrayStarts">An array</param>
-        private static void LabelReachableNodesDfs(
-            int currentVertex, bool[] visitedVertices, int[] edgeDestinationIndices, int[] edgeArrayStarts)
-        {
-            Debug.Assert(!visitedVertices[currentVertex], "Visited vertices must not be revisited.");
-            visitedVertices[currentVertex] = true;
-
-            for (int edgeIndex = edgeArrayStarts[currentVertex]; edgeIndex < edgeArrayStarts[currentVertex + 1]; ++edgeIndex)
-            {
-                int destVertexIndex = edgeDestinationIndices[edgeIndex];
-                if (!visitedVertices[destVertexIndex])
-                {
-                    LabelReachableNodesDfs(destVertexIndex, visitedVertices, edgeDestinationIndices, edgeArrayStarts);
-                }
-            }
-        }
-
-        /// <summary>
         /// For each state computes whether any state with non-zero ending weight can be reached from it.
         /// </summary>
         /// <returns>An array mapping state indices to end state reachability.</returns>
@@ -2140,71 +2117,31 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             }
 
             //// Now run a depth-first search to label all reachable nodes
-
             bool[] visitedNodes = new bool[this.States.Count];
             for (int i = 0; i < this.States.Count; ++i)
             {
                 if (!visitedNodes[i] && this.States[i].CanEnd)
                 {
-                    LabelReachableNodesDfs(i, visitedNodes, edgeDestinationIndices, edgeArrayStarts);
+                    LabelReachableNodesDfs(i);
                 }
             }
 
             return visitedNodes;
-        }
 
-        /// <summary>
-        /// For each state computes whether it can be reached from the start state.
-        /// </summary>
-        /// <returns>An array mapping state indices to start state reachability.</returns>
-        private bool[] ComputeStartStateReachability()
-        {
-            //// First, build a reversed graph
-
-            int[] edgePlacementIndices = new int[this.States.Count + 1];
-            for (int i = 0; i < this.States.Count; ++i)
+            void LabelReachableNodesDfs(int currentVertex)
             {
-                var state = this.States[i];
-                foreach (var transition in state.Transitions)
+                Debug.Assert(!visitedNodes[currentVertex], "Visited vertices must not be revisited.");
+                visitedNodes[currentVertex] = true;
+
+                for (int edgeIndex = edgeArrayStarts[currentVertex]; edgeIndex < edgeArrayStarts[currentVertex + 1]; ++edgeIndex)
                 {
-                    if (!transition.Weight.IsZero)
+                    int destVertexIndex = edgeDestinationIndices[edgeIndex];
+                    if (!visitedNodes[destVertexIndex])
                     {
-                        ++edgePlacementIndices[i + 1];
+                        LabelReachableNodesDfs(destVertexIndex);
                     }
                 }
             }
-
-            // The element of edgePlacementIndices at index i+1 contains a count of the number of edges 
-            // going out of the i'th state (the outdegree of the state).
-            // Convert this into a cumulative count (which will be used to give a unique index to each edge).
-            for (int i = 1; i < edgePlacementIndices.Length; ++i)
-            {
-                edgePlacementIndices[i] += edgePlacementIndices[i - 1];
-            }
-
-            int[] edgeArrayStarts = (int[])edgePlacementIndices.Clone();
-            int totalEdgeCount = edgePlacementIndices[this.States.Count];
-            int[] edgeDestinationIndices = new int[totalEdgeCount];
-            for (int i = 0; i < this.States.Count; ++i)
-            {
-                var state = this.States[i];
-                foreach (var transition in state.Transitions)
-                {
-                    if (!transition.Weight.IsZero)
-                    {
-                        // The unique index for this edge
-                        int edgePlacementIndex = edgePlacementIndices[i]++;
-
-                        // The destination index for the edge 
-                        edgeDestinationIndices[edgePlacementIndex] = transition.DestinationStateIndex;
-                    }
-                }
-            }
-
-            //// Now run a depth-first search to label all reachable nodes
-            bool[] visitedNodes = new bool[this.States.Count];
-            LabelReachableNodesDfs(this.Start.Index, visitedNodes, edgeDestinationIndices, edgeArrayStarts);
-            return visitedNodes;
         }
 
         /// <summary>

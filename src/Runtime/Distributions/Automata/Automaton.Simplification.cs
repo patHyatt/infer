@@ -100,7 +100,6 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
 
             public bool Simplify()
             {
-                /*
                 this.MergeParallelTransitions();
 
                 // TODO FIX FIX FIX
@@ -108,6 +107,8 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 {
                     return false; // TODO: make this stuff work with non-trivial loops
                 }
+
+                /*
 
                 ArrayDictionary<bool> stateLabels = this.LabelStatesForSimplification();
                 var sequenceToLogWeight = this.BuildAcceptedSequenceList(stateLabels);
@@ -140,13 +141,72 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             /// <summary>
             /// Optimizes the automaton by removing all states unreachable from the end state.
             /// </summary>
+            /// <remarks>
+            /// This function looks a lot like <see cref="ComputeEndStateReachability"/>. But unfortunately operates on
+            /// a different graph representation.
+            /// </remarks>
             public bool RemoveDeadStates()
             {
-                return this.builder.RemoveStates(FindDeadStates()) > 0;
+                var builder = this.builder;
+                var visited = new bool[builder.StatesCount];
+                var (edgesStart, edges) = BuildReversedGraph();
 
-                bool[] FindDeadStates()
+                for (var i = 0; i < builder.StatesCount; ++i)
                 {
-                    throw new NotImplementedException();
+                    if (builder[i].CanEnd)
+                    {
+                        Traverse(i);
+                    }
+                }
+
+                return this.builder.RemoveStates(visited) > 0;
+
+                void Traverse(int index)
+                {
+                    if (!visited[index])
+                    {
+                        visited[index] = true;
+                        for (var i = edgesStart[index]; i < edgesStart[index + 1]; ++i)
+                        {
+                            Traverse(edges[i]);
+                        }
+                    }
+                }
+
+                (int[] edgesStart, int[] edges) BuildReversedGraph()
+                {
+                    // [edgesStart[i]; edgesStart[i+1]) is a range `edges` array which corresponds to incoming edges for state `i`
+                    var edgesStart1 = new int[builder.StatesCount + 1];
+
+                    // incomming edges for state. Represented as index of source state
+                    var edges1 = new int[builder.TransitionsCount];
+
+                    // first populate edges
+                    for (var i = 0; i < builder.StatesCount; ++i)
+                    {
+                        for (var iterator = builder[i].TransitionIterator; iterator.Ok; iterator.Next())
+                        {
+                            ++edgesStart1[iterator.Value.DestinationStateIndex];
+                        }
+                    }
+
+                    // calculate commutative sums. Now edgesStart[i] contains end of range
+                    for (var i = 0; i < builder.StatesCount; ++i)
+                    {
+                        edgesStart1[i + 1] += edgesStart1[i];
+                    }
+
+                    // Fill ranges and adjust start indices. Now edgesStart[i] contains begining of the range
+                    for (var i = 0; i < builder.StatesCount; ++i)
+                    {
+                        for (var iterator = builder[i].TransitionIterator; iterator.Ok; iterator.Next())
+                        {
+                            var index = --edgesStart1[iterator.Value.DestinationStateIndex];
+                            edges1[index] = i;
+                        }
+                    }
+
+                    return (edgesStart1, edges1);
                 }
             }
 
@@ -178,6 +238,72 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                     throw new NotImplementedException();
                 }
             }
+
+            /*
+
+
+        /// <summary>
+        /// For each state computes whether any state with non-zero ending weight can be reached from it.
+        /// </summary>
+        /// <returns>An array mapping state indices to end state reachability.</returns>
+        private bool[] ComputeEndStateReachability()
+        {
+            //// First, build a reversed graph
+
+            int[] edgePlacementIndices = new int[this.States.Count + 1];
+            for (int i = 0; i < this.States.Count; ++i)
+            {
+                var state = this.States[i];
+                foreach (var transition in state.Transitions)
+                {
+                    if (!transition.Weight.IsZero)
+                    {
+                        ++edgePlacementIndices[transition.DestinationStateIndex + 1];
+                    }
+                }
+            }
+
+            // The element of edgePlacementIndices at index i+1 contains a count of the number of edges 
+            // going into the i'th state (the indegree of the state).
+            // Convert this into a cumulative count (which will be used to give a unique index to each edge).
+            for (int i = 1; i < edgePlacementIndices.Length; ++i)
+            {
+                edgePlacementIndices[i] += edgePlacementIndices[i - 1];
+            }
+
+            int[] edgeArrayStarts = (int[])edgePlacementIndices.Clone();
+            int totalEdgeCount = edgePlacementIndices[this.States.Count];
+            int[] edgeDestinationIndices = new int[totalEdgeCount];
+            for (int i = 0; i < this.States.Count; ++i)
+            {
+                var state = this.States[i];
+                foreach (var transition in state.Transitions)
+                {
+                    if (!transition.Weight.IsZero)
+                    {
+                        // The unique index for this edge
+                        int edgePlacementIndex = edgePlacementIndices[transition.DestinationStateIndex]++;
+
+                        // The source index for the edge (which is the destination edge in the reversed graph)
+                        edgeDestinationIndices[edgePlacementIndex] = i;
+                    }
+                }
+            }
+
+            //// Now run a depth-first search to label all reachable nodes
+
+            bool[] visitedNodes = new bool[this.States.Count];
+            for (int i = 0; i < this.States.Count; ++i)
+            {
+                if (!visitedNodes[i] && this.States[i].CanEnd)
+                {
+                    LabelReachableNodesDfs(i, visitedNodes, edgeDestinationIndices, edgeArrayStarts);
+                }
+            }
+
+            return visitedNodes;
+        }
+            */
             
             /// <summary>
             /// Labels each state with a value indicating whether the automaton having that state as the start state is a
@@ -241,27 +367,24 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
             /// </summary>
             public void MergeParallelTransitions()
             {
-                throw new NotImplementedException();
-
-                /*
-
-                for (int stateIndex = 0; stateIndex < this.States.Count; ++stateIndex)
+                for (var stateIndex = 0; stateIndex < this.builder.StatesCount; ++stateIndex)
                 {
-                    var state = this.States[stateIndex];
-                    var transitions = state.Transitions;
-                    for (int transitionIndex1 = 0; transitionIndex1 < transitions.Count; ++transitionIndex1)
+                    var state = this.builder[stateIndex];
+                    for (var iterator1 = state.TransitionIterator; iterator1.Ok; iterator1.Next())
                     {
-                        Transition transition1 = transitions[transitionIndex1];
-                        for (int transitionIndex2 = transitionIndex1 + 1; transitionIndex2 < transitions.Count; ++transitionIndex2)
+                        var transition1 = iterator1.Value;
+                        var iterator2 = iterator1;
+                        iterator2.Next();
+                        for (; iterator2.Ok; iterator2.Next())
                         {
-                            Transition transition2 = transitions[transitionIndex2];
+                            var transition2 = iterator2.Value;
                             if (transition1.DestinationStateIndex == transition2.DestinationStateIndex && transition1.Group == transition2.Group)
                             {
-                                bool removeTransition2 = false;
+                                var removeTransition2 = false;
                                 if (transition1.IsEpsilon && transition2.IsEpsilon)
                                 {
                                     transition1.Weight = Weight.Sum(transition1.Weight, transition2.Weight);
-                                    state.SetTransition(transitionIndex1, transition1);
+                                    iterator1.Value = transition1;
                                     removeTransition2 = true;
                                 }
                                 else if (!transition1.IsEpsilon && !transition2.IsEpsilon)
@@ -278,21 +401,18 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
 
                                     transition1.ElementDistribution = newElementDistribution;
                                     transition1.Weight = Weight.Sum(transition1.Weight, transition2.Weight);
-                                    state.SetTransition(transitionIndex1, transition1);
+                                    iterator1.Value = transition1;
                                     removeTransition2 = true;
                                 }
 
                                 if (removeTransition2)
                                 {
-                                    state.RemoveTransition(transitionIndex2);
-                                    --transitionIndex2;
+                                    iterator2.MarkRemoved();
                                 }
                             }
                         }
                     }
                 }
-
-                */
             }
 
             /// <summary>
