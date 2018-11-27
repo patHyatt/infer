@@ -108,8 +108,6 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                     return false; // TODO: make this stuff work with non-trivial loops
                 }
 
-                /*
-
                 ArrayDictionary<bool> stateLabels = this.LabelStatesForSimplification();
                 var sequenceToLogWeight = this.BuildAcceptedSequenceList(stateLabels);
 
@@ -133,7 +131,6 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 {
                     this.AddGeneralizedSequence(firstNonCopiedStateIndex, weightedSequence.Sequence, weightedSequence.Weight);
                 }
-                */
 
                 return true;
             }
@@ -239,127 +236,46 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                 }
             }
 
-            /*
-
-
-        /// <summary>
-        /// For each state computes whether any state with non-zero ending weight can be reached from it.
-        /// </summary>
-        /// <returns>An array mapping state indices to end state reachability.</returns>
-        private bool[] ComputeEndStateReachability()
-        {
-            //// First, build a reversed graph
-
-            int[] edgePlacementIndices = new int[this.States.Count + 1];
-            for (int i = 0; i < this.States.Count; ++i)
-            {
-                var state = this.States[i];
-                foreach (var transition in state.Transitions)
-                {
-                    if (!transition.Weight.IsZero)
-                    {
-                        ++edgePlacementIndices[transition.DestinationStateIndex + 1];
-                    }
-                }
-            }
-
-            // The element of edgePlacementIndices at index i+1 contains a count of the number of edges 
-            // going into the i'th state (the indegree of the state).
-            // Convert this into a cumulative count (which will be used to give a unique index to each edge).
-            for (int i = 1; i < edgePlacementIndices.Length; ++i)
-            {
-                edgePlacementIndices[i] += edgePlacementIndices[i - 1];
-            }
-
-            int[] edgeArrayStarts = (int[])edgePlacementIndices.Clone();
-            int totalEdgeCount = edgePlacementIndices[this.States.Count];
-            int[] edgeDestinationIndices = new int[totalEdgeCount];
-            for (int i = 0; i < this.States.Count; ++i)
-            {
-                var state = this.States[i];
-                foreach (var transition in state.Transitions)
-                {
-                    if (!transition.Weight.IsZero)
-                    {
-                        // The unique index for this edge
-                        int edgePlacementIndex = edgePlacementIndices[transition.DestinationStateIndex]++;
-
-                        // The source index for the edge (which is the destination edge in the reversed graph)
-                        edgeDestinationIndices[edgePlacementIndex] = i;
-                    }
-                }
-            }
-
-            //// Now run a depth-first search to label all reachable nodes
-
-            bool[] visitedNodes = new bool[this.States.Count];
-            for (int i = 0; i < this.States.Count; ++i)
-            {
-                if (!visitedNodes[i] && this.States[i].CanEnd)
-                {
-                    LabelReachableNodesDfs(i, visitedNodes, edgeDestinationIndices, edgeArrayStarts);
-                }
-            }
-
-            return visitedNodes;
-        }
-            */
-            
             /// <summary>
             /// Labels each state with a value indicating whether the automaton having that state as the start state is a
             /// generalized tree (i.e. a tree with self-loops), which is also unreachable from previously traversed states.
             /// </summary>
             /// <returns>A dictionary mapping state indices to the computed labels.</returns>
-            private ArrayDictionary<bool> LabelStatesForSimplification()
+            private bool[] FindGeneralizedTrees()
             {
-                throw new NotImplementedException();
-                /*
-                var result = new ArrayDictionary<bool>();
-                this.DoLabelStatesForSimplification(this.Start, result);
-                return result;
-                */
-            }
-
-            /// <summary>
-            /// Recursively labels each state with a value indicating whether the automaton having that state as the start state
-            /// is a generalized tree (i.e. a tree with self-loops), which is also unreachable from previously traversed states.
-            /// </summary>
-            /// <param name="currentState">The currently traversed state.</param>
-            /// <param name="stateLabels">A dictionary mapping state indices to the computed labels.</param>
-            /// <returns>
-            /// <see langword="true"/> if the automaton having <paramref name="currentState"/> having that state as the start state
-            /// is a generalized tree and it was the first visit to it, <see langword="false"/> otherwise.
-            /// </returns>
-            private bool DoLabelStatesForSimplification(State currentState, ArrayDictionary<bool> stateLabels)
-            {
-                throw new NotImplementedException();
-
-                /*
-
-                if (stateLabels.ContainsKey(currentState.Index))
-                {
-                    // This is not the first visit to the state
-                    return false;
-                }
-
-                stateLabels.Add(currentState.Index, true);
-
-                bool isGeneralizedTree = true;
-                foreach (var transition in currentState.Transitions)
-                {
-
-                    // Self-loops are allowed
-                    if (transition.DestinationStateIndex != currentState.Index)
-                    {
-                        isGeneralizedTree &= this.DoLabelStatesForSimplification(this.States[transition.DestinationStateIndex], stateLabels);
-                    }
-                }
-
-                // It was the first visit to the state
-                stateLabels[currentState.Index] = isGeneralizedTree;
+                // TODO: RENAME
+                var builder = this.builder;
+                var visited = new bool[this.builder.StatesCount];
+                var isGeneralizedTree = new bool[this.builder.StatesCount];
+                Traverse(this.builder.StartStateIndex);
                 return isGeneralizedTree;
 
-                */
+                bool Traverse(int currentStateIndex)
+                {
+                    if (visited[currentStateIndex])
+                    {
+                        // This is not the first visit to the state
+                        return false;
+                    }
+
+                    visited[currentStateIndex] = true;
+
+                    var currentIsGeneralizedTree = true;
+                    for (var iterator = builder[currentStateIndex].TransitionIterator; iterator.Ok; iterator.Next())
+                    {
+                        var transition = iterator.Value;
+
+                        // Self-loops are allowed
+                        if (transition.DestinationStateIndex != currentStateIndex)
+                        {
+                            currentIsGeneralizedTree &= Traverse(transition.DestinationStateIndex);
+                        }
+                    }
+
+                    // It was the first visit to the state
+                    isGeneralizedTree[currentStateIndex] = currentIsGeneralizedTree;
+                    return currentIsGeneralizedTree;
+                }
             }
 
             /// <summary>
