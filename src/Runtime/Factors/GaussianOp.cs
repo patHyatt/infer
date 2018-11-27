@@ -328,6 +328,7 @@ namespace Microsoft.ML.Probabilistic.Factors
                 double[] nodes = new double[QuadratureNodeCount];
                 double[] logWeights = new double[nodes.Length];
                 Gamma precMarginal = precision * to_precision;
+                if (precMarginal.IsPointMass) return SampleAverageConditional(mean, precMarginal.Point);
                 precMarginal = GaussianOp_Laplace.Q(sample, mean, precision, precMarginal);
                 QuadratureNodesAndWeights(precMarginal, nodes, logWeights);
                 if (!to_precision.IsUniform())
@@ -592,15 +593,15 @@ namespace Microsoft.ML.Probabilistic.Factors
             {
                 result.SetToUniform();
             }
-            else if (!precision.IsProper())
-            {
-                // improper prior
-                throw new ImproperMessageException(precision);
-            }
             else if (precision.IsPointMass)
             {
                 // must return a sensible value since precision could be initialized to a point mass.
                 return PrecisionAverageConditional_Point(ym, yv, precision.Point);
+            }
+            else if (!precision.IsProper())
+            {
+                // improper prior
+                throw new ImproperMessageException(precision);
             }
             else
             {
@@ -671,7 +672,6 @@ namespace Microsoft.ML.Probabilistic.Factors
                         {
                             double v = 1.0 / nodes[i];
                             double denom = 1 / (yv + v);
-                            double v2 = v * v;
                             double denom2 = denom * denom;
                             double dlogf1 = -0.5 * denom + 0.5 * ym2 * denom2;
                             // dlogfr = r f'/f
@@ -679,7 +679,7 @@ namespace Microsoft.ML.Probabilistic.Factors
                             double dlogf2 = (0.5 - ym2 * denom) * denom2;
                             // ddfrr = r^2 f''/f
                             // f''/f = d(f'/f) + (f'/f)^2
-                            double ddfrr = dlogfr * dlogfr + dlogf2 * v2 + (2 * v) * dlogf1;
+                            double ddfrr = dlogfr * dlogfr + dlogf2 * v * v + (2 * v) * dlogf1;
                             sum1 += dlogfr * f;
                             sum2 += ddfrr * f;
                         }
@@ -2236,7 +2236,7 @@ namespace Microsoft.ML.Probabilistic.Factors
             if (double.IsPositiveInfinity(v))
                 return new double[4];
             // log f(x) = -0.5*log(v+1/x) -0.5*m^2/(v+1/x)
-            if (x * v > 1)
+            if (x * v > 1 && false)
             {
                 double m2 = m * m;
                 double x2 = x * x;

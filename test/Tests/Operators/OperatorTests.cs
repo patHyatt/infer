@@ -25,14 +25,14 @@ namespace Microsoft.ML.Probabilistic.Tests
         [Fact]
         public void AverageTest()
         {
-            foreach(var a in Doubles())
+            foreach (var a in Doubles())
             {
-                foreach(var b in Doubles())
+                foreach (var b in Doubles())
                 {
-                    if (double.IsNaN(a+b)) continue;
+                    if (double.IsNaN(a + b)) continue;
                     double midpoint = MMath.Average(a, b);
-                    Assert.True(midpoint >= System.Math.Min(a,b));
-                    Assert.True(midpoint <= System.Math.Max(a,b));
+                    Assert.True(midpoint >= System.Math.Min(a, b));
+                    Assert.True(midpoint <= System.Math.Max(a, b));
                 }
             }
         }
@@ -2757,9 +2757,38 @@ weight * (tau + alphaX) + alphaX
         }
 
         [Fact]
+        public void GaussianIsBetweenCRRR_IsMonotonicInX()
+        {
+            Gaussian previousToX = new Gaussian();
+            Gaussian previousToLowerBound = new Gaussian();
+            Gaussian previousToUpperBound = new Gaussian();
+            Gaussian lowerBound = Gaussian.FromNatural(-200, 100);
+            Gaussian upperBound = Gaussian.FromNatural(255, 147);
+            Bernoulli isBetween = Bernoulli.PointMass(true);
+            for (int i = 0; i < 100; i++)
+            {
+                Gaussian X = Gaussian.FromNatural(1.2, System.Math.Pow(10, -i*0.1));
+                var toX = DoubleIsBetweenOp.XAverageConditional_Slow(isBetween, X, lowerBound, upperBound);
+                var toLowerBound = DoubleIsBetweenOp.LowerBoundAverageConditional_Slow(isBetween, X, lowerBound, upperBound);
+                var toUpperBound = DoubleIsBetweenOp.UpperBoundAverageConditional_Slow(isBetween, X, lowerBound, upperBound);
+                Trace.WriteLine($"{X}: {toX} {toLowerBound} {toUpperBound}");
+                if (i > 0)
+                {
+                    Assert.True(previousToLowerBound.GetMean() >= toLowerBound.GetMean());
+                    //Assert.True(previousToLowerBound.GetVariance() <= toLowerBound.GetVariance());
+                    Assert.True(previousToUpperBound.GetMean() <= toUpperBound.GetMean());
+                    Assert.True(previousToUpperBound.GetVariance() <= toUpperBound.GetVariance());
+                }
+                previousToX = toX;
+                previousToLowerBound = toLowerBound;
+                previousToUpperBound = toUpperBound;
+            }
+        }
+
+        [Fact]
         public void GaussianIsBetweenTest2()
         {
-            DoubleIsBetweenOp.UpperBoundAverageConditional_Slow(Bernoulli.PointMass(true), Gaussian.FromNatural(1.2, 1E-13), Gaussian.FromNatural(-200, 100), Gaussian.FromNatural(255, 147));
+            DoubleIsBetweenOp.XAverageConditional_Slow(Bernoulli.PointMass(true), Gaussian.FromNatural(0.9106071714590378, 5.9521837280027985E-11), Gaussian.FromNatural(-49.9894026120194, 107.30343404076896), Gaussian.FromNatural(49.051818445888259, 107.26846525506932));
             Assert.True(!double.IsNaN(DoubleIsBetweenOp.XAverageConditional(Bernoulli.PointMass(true), new Gaussian(1, 2), double.PositiveInfinity, double.PositiveInfinity).MeanTimesPrecision));
             Bernoulli isBetween = new Bernoulli(1);
             Gaussian x = new Gaussian(0, 1);

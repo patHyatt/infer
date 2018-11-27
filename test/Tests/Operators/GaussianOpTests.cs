@@ -230,6 +230,12 @@ namespace Microsoft.ML.Probabilistic.Tests
             Gamma Precision, to_precision;
             Gaussian xActual, xExpected;
 
+            X = Gaussian.FromNatural(-2.7793306963303595, 0.050822473645365768);
+            Mean = Gaussian.FromNatural(-5.9447032851878134E-09, 3.2975231004586637E-204);
+            Precision = Gamma.FromShapeAndRate(318.50907574398883, 9.6226982361933746E+205);
+            to_precision = Gamma.PointMass(0);
+            xActual = GaussianOp.SampleAverageConditional(X, Mean, Precision, to_precision);
+
             X = Gaussian.FromNatural(0.1559599323109816, 8.5162535450918462);
             Mean = Gaussian.PointMass(0.57957597647840942);
             Precision = Gamma.FromShapeAndRate(7.8308812008325587E+30, 8.2854255911709925E+30);
@@ -368,22 +374,30 @@ namespace Microsoft.ML.Probabilistic.Tests
         /// Test that the operator behaves correctly when sample has large variance.
         /// Here we see that the message.Rate is non-monotonic in the sample variance, which doesn't seem right.
         /// </summary>
+        [Fact]
         [Trait("Category", "ModifiesGlobals")]
-        internal void GaussianOpPrecision3()
+        public void GaussianOpPrecision_IsMonotonicInSampleVariance()
         {
             using (TestUtils.TemporarilyAllowGaussianImproperMessages)
             {
                 Gaussian mean = Gaussian.PointMass(0);
-                Gamma precision = Gamma.FromShapeAndRate(2, 10);
-                for (int i = -10; i < 10; i++)
+                for (int logRate = 0; logRate < 310; logRate++)
                 {
-                    Gaussian sample = Gaussian.FromMeanAndPrecision(0, System.Math.Pow(10, -i));
-                    Gamma precMsg = GaussianOp.PrecisionAverageConditional(sample, mean, precision);
-                    //precMsg = GaussianOp_Laplace.PrecisionAverageConditional_slow(sample, mean, precision);
-                    //Gamma precMsg2 = GaussianOp_Slow.PrecisionAverageConditional(sample, mean, precision);
-                    //Console.WriteLine("{0}: {1} should be {2}", sample, precMsg, precMsg2);
-                    Gamma post = precMsg * precision;
-                    Console.WriteLine("{0}: {1} post = {2}", sample, precMsg.Rate, post.Rate);
+                    Gamma precision = Gamma.FromShapeAndRate(300, System.Math.Pow(10, logRate));
+                    double previousRate = double.PositiveInfinity;
+                    for (int i = 0; i < 310; i++)
+                    {
+                        Gaussian sample = Gaussian.FromMeanAndPrecision(0, System.Math.Pow(10, -i));
+                        Gamma precMsg = GaussianOp.PrecisionAverageConditional(sample, mean, precision);
+                        //precMsg = GaussianOp_Laplace.PrecisionAverageConditional_slow(sample, mean, precision);
+                        //Gamma precMsg2 = GaussianOp_Slow.PrecisionAverageConditional(sample, mean, precision);
+                        //Console.WriteLine("{0}: {1} should be {2}", sample, precMsg, precMsg2);
+                        Gamma post = precMsg * precision;
+                        //Trace.WriteLine($"{sample}: {precMsg.Rate} post = {post.Rate}");
+                        if (i >= logRate)
+                            Assert.True(precMsg.Rate <= previousRate);
+                        previousRate = precMsg.Rate;
+                    }
                 }
             }
         }

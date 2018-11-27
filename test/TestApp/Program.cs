@@ -81,8 +81,9 @@ namespace TestApp
             Stopwatch watch = new Stopwatch();
             watch.Start();
 
-            new GaussianOpTests().GaussianOpPrecision();
+            //new GaussianOpTests().GaussianOpX();
             //new OperatorTests().GaussianIsBetweenTest2();
+            new OperatorTests().GaussianIsBetweenCRRR_IsMonotonicInX();
 
             if (false)
             {
