@@ -108,7 +108,7 @@ namespace Microsoft.ML.Probabilistic.Distributions.Automata
                     return false; // TODO: make this stuff work with non-trivial loops
                 }
 
-                ArrayDictionary<bool> stateLabels = this.LabelStatesForSimplification();
+                var stateLabels = this.LabelStatesForSimplification();
                 var sequenceToLogWeight = this.BuildAcceptedSequenceList(stateLabels);
 
                 TThis result = this.RemoveSimplifiable(stateLabels);
